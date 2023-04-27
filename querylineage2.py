@@ -389,7 +389,7 @@ class QueryLineageAnalysis:
                 cols.append(col.alias_or_name.upper())
         elif isinstance(sqlObj, exp.Insert) and isinstance(sqlObj.this, exp.Table):
             ddl = ddllist[targetTableName.upper()]
-            cols.extend(ddl.upper())
+            cols.extend(ddl)
         elif isinstance(sqlObj, exp.Create):
             sels = list(sqlObj.find_all(exp.Subquery))
             if len(sels) > 0:
@@ -507,6 +507,7 @@ class QueryLineageAnalysis:
         if "INSERT " in "".strip():
             return stmt
         res = []
+        state = 0
         tokens = re.split(" |\n",stmt)
         for token in tokens:
             tok = token.strip().upper()
