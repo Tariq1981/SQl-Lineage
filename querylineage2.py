@@ -108,6 +108,8 @@ class QueryLineageAnalysis:
         else:
             return None
 
+    def filterTables(self):
+        pass
     def isStmtOK(self,stmt):
         pp=sqlparse.parse(stmt)
         ls = []
@@ -185,7 +187,9 @@ class QueryLineageAnalysis:
 
     def __getSQLLineage__(self,sqlState, ddlList):
         sqlObbj = parse_one(sqlState, "bigquery")
-        targTable = self.__getTargetTable__(sqlObbj)
+        (targTable,DBName) = self.__getTargetTable__(sqlObbj)
+        if DBName:
+            self.DBTableLookup[targTable] = DBName
         targCols = self.__getTargetTableColumns__(targTable, sqlObbj, ddlList)
         ls = []
         for ind in range(0, len(targCols)):
@@ -242,6 +246,8 @@ class QueryLineageAnalysis:
                                     (tabl == fr.alias_or_name.upper() or (
                                             len(fr.alias_or_name) == 0 and tabl == fr.name.upper())):
                                 ls.append((cc[1], fr.name.upper()))
+                                if 'db' in fr.args and fr.args['db']:
+                                    self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
                                 break
                     else:
                         for fr in frJ:
@@ -253,6 +259,8 @@ class QueryLineageAnalysis:
                             elif isinstance(fr, exp.Table):
                                 if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                     ls.append((cc[1], fr.name.upper()))
+                                if 'db' in fr.args and fr.args['db']:
+                                    self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
                             if len(frJ) == 1 and len(cc[0]) == 0:
                                 ls.append((cc[1], fr.name.upper()))
         else:
@@ -274,6 +282,8 @@ class QueryLineageAnalysis:
                                 (tabl == fr.alias_or_name.upper() or (
                                         len(fr.alias_or_name) == 0 and tabl == fr.name.upper())):
                             ls.append((cc[1], fr.name.upper()))
+                            if 'db' in fr.args and fr.args['db']:
+                                self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
                             break
                 else:
                     for fr in frJ:
@@ -285,6 +295,8 @@ class QueryLineageAnalysis:
                         elif isinstance(fr, exp.Table):
                             if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                 ls.append((cc[1], fr.name.upper()))
+                            if 'db' in fr.args and fr.args['db']:
+                                self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
                         if len(frJ) ==1 and len(cc[0]) ==0:
                             ls.append((cc[1], fr.name.upper()))
 
@@ -372,6 +384,7 @@ class QueryLineageAnalysis:
 
     def __getTargetTable__(self,sqllotObj):
         tableName = None
+        DBName = None
         if isinstance(sqllotObj, exp.Create) or isinstance(sqllotObj, exp.Insert):
             current = sqllotObj.this
             while current and not isinstance(current, exp.Table):
@@ -379,7 +392,9 @@ class QueryLineageAnalysis:
             if current:
                 table: exp.Table = current
                 tableName = table.alias_or_name
-        return tableName.upper()
+                if 'db' in table.args and table.args['db']:
+                    DBName = table.args['db'].alias_or_name
+        return (tableName.upper(),DBName.upper())
 
     def __getTargetTableColumns__(self,targetTableName, sqlObj, ddllist):
         cols = []
@@ -561,8 +576,6 @@ class QueryLineageAnalysis:
                 ls.append(str(tok))
 
         return (ls,flags)
-
-
 
 
     def __removePartitionBy__(self,sql):
