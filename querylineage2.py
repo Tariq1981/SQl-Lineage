@@ -108,8 +108,28 @@ class QueryLineageAnalysis:
         else:
             return None
 
-    def filterTables(self):
-        pass
+    def filterRelations(self,targetTable,dbListExclude):
+        relationsSetNew = defaultdict(list)
+        for relation in self.relationsSet.keys():
+            tgtTable = relation[0]
+            if tgtTable == targetTable:
+                relationsSetNew[relation].extend(self.__getSourcePair__(relation,dbListExclude))
+        return relationsSetNew
+    def __getSourcePair__(self,srcPairInput,dbListExclude):
+        dbListExcludeSet = set(dbListExclude)
+        ls = set()
+        for srcPair in self.relationsSet[srcPairInput]:
+            if self.DBTableLookup[srcPair[0]] in dbListExcludeSet:
+                pairs = self.__getSourcePair__(srcPair,dbListExcludeSet)
+                ls.update(pairs)
+            else:
+                ls.add(srcPair)
+
+        return ls
+
+
+
+
     def isStmtOK(self,stmt):
         pp=sqlparse.parse(stmt)
         ls = []
@@ -671,6 +691,7 @@ if __name__ == "__main__":
     #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
     ln = QueryLineageAnalysis("./", None, "./")
     ln.getLineage("Test")
+    dfdfd = ln.filterRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
     ln.createGraphviz("Test","./",None)
     ln.writeGraphvizToPNG("Tab4.png")
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt")
