@@ -320,7 +320,7 @@ class QueryLineageAnalysis:
                         if len(frJ) ==1 and len(cc[0]) ==0:
                             ls.append((cc[1], fr.name.upper()))
 
-        return ls
+        return list(set(ls))
 
     def __getColList__(self,col):
         cols = list(col.find_all(exp.Column))
@@ -477,7 +477,7 @@ class QueryLineageAnalysis:
                     else:
                         sels = list(f.find_all(exp.Select))
                         for coli in sels[0].selects:
-                            if isinstance(coli.this, exp.Star):
+                            if isinstance(coli.this, exp.Star) or isinstance(coli, exp.Star):
                                 cols = self.__replaceStarInQuery__(coli, ddlList)
                                 ls.extend(cols)
                             else:
