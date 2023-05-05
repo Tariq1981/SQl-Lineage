@@ -12,6 +12,10 @@ import sqlglot.expressions as exp
 from itertools import filterfalse
 from lineage_diagram import lineageDiagram
 from drawio_gen import DrawIOLineageGenerator
+from sqllineage.runner import LineageRunner
+from sqllineage.utils.constant import LineageLevel
+
+
 """ 
 Queries in the path with name as target table + .sql
 """
@@ -110,7 +114,8 @@ class QueryLineageAnalysis:
 
     def filterRelations(self,targetTable,dbListExclude):
         relationsSetNew = defaultdict(list)
-        for relation in self.relationsSet.keys():
+        keys = list(self.relationsSet)
+        for relation in keys:
             tgtTable = relation[0]
             if tgtTable == targetTable:
                 relationsSetNew[relation].extend(self.__getSourcePair__(relation,dbListExclude))
@@ -161,6 +166,10 @@ class QueryLineageAnalysis:
             sql0 = self.__convertCreateSelectToSubuery__(sql0)
             sfg = self.__convertCTEtoSubqueries__(sql0)
             lsff = self.__replaceStarInScript__(sfg, self.tablesSet)
+
+            #result = LineageRunner(str(lsff), verbose=True)
+            #cols_lin = result.get_column_lineage(exclude_subquery=False)
+
             lin = self.__getSQLLineage__(str(lsff), self.tablesSet)
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
@@ -213,15 +222,14 @@ class QueryLineageAnalysis:
         targCols = self.__getTargetTableColumns__(targTable, sqlObbj, ddlList)
         ls = []
         for ind in range(0, len(targCols)):
-            if isinstance(sqlObbj, exp.Insert):
-                sels = list(sqlObbj.find_all(exp.Select))
-                col = sels[0].selects[ind].alias_or_name.upper()
-                srcColTable = self.__getSourceColumn__(ind, col, sqlObbj, ddlList)
-            else:
-                srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
-            # srcTable = getSourceTable(ind,sqlObbj,ddlList)
-            # if len(srcTable) == 0:
-            #    srcTable=["CONSTANT"]
+            srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
+            #if isinstance(sqlObbj, exp.Insert):
+            #    sels = list(sqlObbj.find_all(exp.Select))
+            #    col = sels[0].selects[ind].alias_or_name.upper()
+            #    srcColTable = self.__getSourceColumn__(ind, col, sqlObbj, ddlList)
+            #else:
+            #    srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
+
             for i in range(0, len(srcColTable)):
                 ls.append(
                     {
@@ -332,8 +340,20 @@ class QueryLineageAnalysis:
 
     def __getColumnByNameFromSelect__(self,sel, colName):
         for col in sel.selects:
-            if col.alias_or_name.upper() == colName:
-                return col
+            aliass = list(col.find_all(exp.Alias))
+            if len(aliass) > 0:
+                for a in aliass:
+                    if a.alias_or_name.upper() == colName:
+                        return a
+            else:
+                cols = list(col.find_all(exp.Column))
+                for c in cols:
+                    if c.alias_or_name.upper() == colName:
+                        return col
+
+
+            #if col.alias_or_name.upper() == colName:
+            #    return col
         return None
     def __getColumnByNameFromSelectInd__(self,sel, colName):
         ind = 0
