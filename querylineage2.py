@@ -34,6 +34,7 @@ class QueryLineageAnalysis:
         self.usedTables=set()
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
+        self.varNames = set()
         self.config = configparser.SafeConfigParser()
         self.__readConfigFile__()
         self.__parseDDL__()
@@ -149,6 +150,13 @@ class QueryLineageAnalysis:
                 ls.extend(ff.tokens)
         return False
 
+    def __isDeclareAddVarName__(self,stmt):
+        stmtTok = stmt.strip().split(" ")
+        if stmtTok[0].upper() == "DECLARE":
+            self.varNames.add(stmtTok[1].upper())
+            return True
+        return False
+
     def getLineage(self, entrytableName):
         raw_sql = self.__readSql__(entrytableName)
         if not (raw_sql):
@@ -156,12 +164,15 @@ class QueryLineageAnalysis:
         statements = raw_sql.split(";")
         for stmt in statements:
             stmt = stmt.strip()
+            self.__isDeclareAddVarName__(stmt)
             if len(stmt) == 0 or not self.isStmtOK(stmt):
                 continue
+
+
             sql0 = self.__removeComments__(stmt)
             #sql0 = self.__removePartitionBy__(sql0)
             sql0 = self.__removePartitionBy2__(sql0)
-            sql0 = sql0.replace("`", "")
+            sql0 = sql0.replace("`", " ")
             sql0 = sql0.replace("-", "_")
             sql0 = self.__convertCreateSelectToSubuery__(sql0)
             sfg = self.__convertCTEtoSubqueries__(sql0)
@@ -171,6 +182,10 @@ class QueryLineageAnalysis:
             #cols_lin = result.get_column_lineage(exclude_subquery=False)
 
             lin = self.__getSQLLineage__(str(lsff), self.tablesSet)
+            with open('lin.txt','w') as ff:
+                for l in lin:
+                    ff.write(str(l))
+                    ff.write('\n')
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
@@ -246,6 +261,8 @@ class QueryLineageAnalysis:
         if column has prefix so check if from with alias
         else loop on all from recorive to get columns
         """
+        if col in self.varNames:
+            return []
         ls = []
         sels = list(sqlObj.find_all(exp.Select))
         if len(sels) == 0:
@@ -719,6 +736,12 @@ if __name__ == "__main__":
     We need to find solution for select with union 
     """
 
+    """
+    Litral orvariables values to be handled as CONSTANT we can pass list of variables to be excluded or to parse ny declare 
+    and exclude them
+    any DECLARE add to list of ecludsion.
+    see why mig_dd_ind parsed variables
+    """
 
     """
     Queries in the insert must have aliases same as column names of the target table
