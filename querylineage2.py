@@ -186,6 +186,9 @@ class QueryLineageAnalysis:
                 for l in lin:
                     ff.write(str(l))
                     ff.write('\n')
+            with open('query.txt','w') as ff:
+                ff.write(str(lsff))
+
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
@@ -280,6 +283,7 @@ class QueryLineageAnalysis:
 
                 frJ = list(sel.find_all(exp.Subquery, exp.Table))
                 for cc in colsls:
+                    flagFound = False
                     tabl = cc[0].upper()
                     if len(tabl) > 0:
                         for fr in frJ:
@@ -304,10 +308,15 @@ class QueryLineageAnalysis:
                             elif isinstance(fr, exp.Table):
                                 if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                     ls.append((cc[1], fr.name.upper()))
+                                    flagFound = True
                                 if 'db' in fr.args and fr.args['db']:
                                     self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
+
                             if len(frJ) == 1 and len(cc[0]) == 0:
                                 ls.append((cc[1], fr.name.upper()))
+
+                            if flagFound:
+                                break
         else:
             colObj = self.__getColumnByNameFromSelect__(sels[0], col)
             if not colObj:
@@ -316,6 +325,7 @@ class QueryLineageAnalysis:
 
             frJ = list(sels[0].find_all(exp.Subquery, exp.Table))
             for cc in colsls:
+                flagFound = False
                 tabl = cc[0].upper()
                 if len(tabl) > 0:
                     for fr in frJ:
@@ -340,10 +350,16 @@ class QueryLineageAnalysis:
                         elif isinstance(fr, exp.Table):
                             if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                 ls.append((cc[1], fr.name.upper()))
+                                flagFound = True
+
                             if 'db' in fr.args and fr.args['db']:
                                 self.DBTableLookup[fr.name.upper()] = fr.args['db'].alias_or_name.upper()
+
                         if len(frJ) ==1 and len(cc[0]) ==0:
                             ls.append((cc[1], fr.name.upper()))
+
+                        if flagFound:
+                            break
 
         return list(set(ls))
 
@@ -747,5 +763,9 @@ if __name__ == "__main__":
     Queries in the insert must have aliases same as column names of the target table
 
     ##### REsolve if more than one subquery with same name should each one to be unique
+    """
+
+    """
+    Small defect if column found in table  so it should not searched in any other tablewithin subquery
     """
 
