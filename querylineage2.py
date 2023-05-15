@@ -33,6 +33,7 @@ class QueryLineageAnalysis:
         self.relationsSet = defaultdict(set)
         self.relationsSetNew = defaultdict(list)
         self.usedTables=set()
+        self.usedTablesFiltered = set()
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
         self.varNames = set()
@@ -59,8 +60,12 @@ class QueryLineageAnalysis:
     def createGraphviz(self,entryTableName,templateFullPath,templateFileName,useFiltered=False):
         self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
         self.diagram.createGraph()
+        usedT = self.usedTables
+        if useFiltered and len(self.usedTablesFiltered) > 0:
+            usedT = self.usedTablesFiltered
+
         for table in self.tablesSet.keys():
-            if table not in self.usedTables:
+            if table not in usedT:
                 continue
             db = self.DBTableLookup[table]
             tableHeaderColor = self.__getConfigItem__('DB_COLOR',db)
@@ -125,6 +130,7 @@ class QueryLineageAnalysis:
 
     def createfilteredRelations(self,targetTable,dbListExclude):
         keys = list(self.relationsSet)
+        self.usedTablesFiltered.add(targetTable)
         for relation in keys:
             tgtTable = relation[0]
             if tgtTable == targetTable:
@@ -141,6 +147,7 @@ class QueryLineageAnalysis:
                             ListPairs.append(self.relationsSet[srcPair])
                         else:
                             ls.add(srcPair)
+                            self.usedTablesFiltered.add(srcPair[0])
                 self.relationsSetNew[relation].extend(ls)
 
 
