@@ -31,6 +31,7 @@ class QueryLineageAnalysis:
         self.configPath = configPath
         self.tablesSet = defaultdict(set)
         self.relationsSet = defaultdict(set)
+        self.relationsSetNew = defaultdict(list)
         self.usedTables=set()
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
@@ -55,7 +56,7 @@ class QueryLineageAnalysis:
                         self.tablesSet[table['table_name']].add(column['name'])
 
 
-    def createGraphviz(self,entryTableName,templateFullPath,templateFileName):
+    def createGraphviz(self,entryTableName,templateFullPath,templateFileName,useFiltered=False):
         self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
         self.diagram.createGraph()
         for table in self.tablesSet.keys():
@@ -67,10 +68,14 @@ class QueryLineageAnalysis:
                 tableHeaderColor = self.DEFAULT_TABLE_HEADER
             self.diagram.createNode(tableHeaderColor,table,list(self.tablesSet[table]))
 
-        for relation in self.relationsSet.keys():
+        tempRelations = self.relationsSet
+        if useFiltered and len(self.relationsSetNew.keys()):
+            tempRelations = self.relationsSetNew
+
+        for relation in tempRelations.keys():
             tgtTable = relation[0]
             tgtColumn = relation[1]
-            for src in self.relationsSet[relation]:
+            for src in tempRelations[relation]:
                 srcTable = src[0]
                 srcColumn = src[1]
                 edgColor = self.__getConfigItem__("EDGE_COLOR","{}_{}".format(tgtTable,srcTable))
@@ -82,13 +87,18 @@ class QueryLineageAnalysis:
 
     def generateDrawIOCSV(self,templatePath,templateFileName,
                           tableStyleName,columnStyleName,
-                          outputPath,outputFileName):
+                          outputPath,outputFileName,
+                          useFiltered=False):
+        tempRelations = self.relationsSet
+        if useFiltered and len(self.relationsSetNew.keys()) > 0:
+            tempRelations = self.relationsSetNew
+
         drawgen = DrawIOLineageGenerator(templatePath,templateFileName,tableStyleName,columnStyleName)
-        for relation in self.relationsSet.keys():
+        for relation in tempRelations.keys():
             tgtTable = relation[0]
             tgtColumn = relation[1]
             drawgen.addTable(tgtTable)
-            for src in self.relationsSet[relation]:
+            for src in tempRelations[relation]:
                 srcTable = src[0]
                 srcColumn = src[1]
                 drawgen.addTable(srcTable)
@@ -113,26 +123,48 @@ class QueryLineageAnalysis:
         else:
             return None
 
+    def createfilteredRelations(self,targetTable,dbListExclude):
+        keys = list(self.relationsSet)
+        for relation in keys:
+            tgtTable = relation[0]
+            if tgtTable == targetTable:
+                ListPairs = [self.relationsSet[relation]]
+                visisted = set()
+                ls = set()
+                while len(ListPairs) > 0:
+                    currentListPairs = ListPairs.pop()
+                    for srcPair in currentListPairs:
+                        if srcPair in visisted:
+                            continue
+                        visisted.add(srcPair)
+                        if self.DBTableLookup[srcPair[0]] in dbListExclude or srcPair[0] == targetTable:
+                            ListPairs.append(self.relationsSet[srcPair])
+                        else:
+                            ls.add(srcPair)
+                self.relationsSetNew[relation].extend(ls)
+
+
+    """
     def filterRelations(self,targetTable,dbListExclude):
         relationsSetNew = defaultdict(list)
         keys = list(self.relationsSet)
         for relation in keys:
             tgtTable = relation[0]
             if tgtTable == targetTable:
-                relationsSetNew[relation].extend(self.__getSourcePair__(relation,dbListExclude))
+                relationsSetNew[relation].extend(self.__getSourcePair__(relation,dbListExclude,targetTable))
         return relationsSetNew
-    def __getSourcePair__(self,srcPairInput,dbListExclude):
+    def __getSourcePair__(self,srcPairInput,dbListExclude,targetTable):
         dbListExcludeSet = set(dbListExclude)
         ls = set()
         for srcPair in self.relationsSet[srcPairInput]:
-            if self.DBTableLookup[srcPair[0]] in dbListExcludeSet:
-                pairs = self.__getSourcePair__(srcPair,dbListExcludeSet)
+            if self.DBTableLookup[srcPair[0]] in dbListExcludeSet or srcPair[0] == targetTable:
+                pairs = self.__getSourcePair__(srcPair,dbListExcludeSet,targetTable)
                 ls.update(pairs)
             else:
                 ls.add(srcPair)
 
         return ls
-
+    """
 
 
 
@@ -744,10 +776,10 @@ if __name__ == "__main__":
     #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
     ln = QueryLineageAnalysis("./", None, "./")
     ln.getLineage("Test")
-    dfdfd = ln.filterRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
-    ln.createGraphviz("Test","./",None)
+    ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
+    ln.createGraphviz("Test","./",None,True)
     ln.writeGraphvizToPNG("Tab4.png")
-    ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt")
+    ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
     """
     We need to find solution for select with union 
     """
