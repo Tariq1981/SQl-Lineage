@@ -242,6 +242,14 @@ class QueryLineageAnalysis:
             if relation not in self.relationsSet:
                 self.relationsSet[relation] = relations[relation]
 
+                tgtTable =relation[0]
+                tgtColumn = relation[1]
+                self.tablesSet[tgtTable].add(tgtColumn)
+                for srcPair in relations[relation]:
+                    srcTable = srcPair[0]
+                    srcColumn = srcPair[1]
+                    self.tablesSet[srcTable].add(srcColumn)
+
     def __getTablesColumnsRelations__(self, colLineages):
         """
         We need to have DDL for the tables and build dictionary key column name and value list of tables
