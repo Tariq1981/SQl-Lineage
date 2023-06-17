@@ -165,17 +165,20 @@ def duplicateEdgesForColumn(mxfile,columnObject):
         mxfile.diagram.mxGraphModel.root.insert(mxfile.diagram.mxGraphModel.root.index(edge) + 1, elem)
     return mxfile
 
+## wrap edge into UserObject before duplicating
+
+
     """
     duplicated column edges added tags
     Try to build action and add it to the column and read styles to the edges and column duplciated and add visible to 0
     """
 
 if __name__ == "__main__":
-    with open("sample_diag.drawio") as file:
+    with open("F_SUBSCRIBER_BASE_SEMANTIC_D.drawio") as file:
         xlstr = file.read()
 
     mxfile = objectify.fromstring(bytes(xlstr,'utf-8'))
-    obj = getTargetTableObject(mxfile,"Dest")
+    obj = getTargetTableObject(mxfile,"F_SUBSCRIBER_BASE_SEMANTIC_D")
     lsColumns = getTargetColumnsObject(mxfile,obj)
     mxfile = duplicateColumns(mxfile,lsColumns)
     for col in lsColumns:
