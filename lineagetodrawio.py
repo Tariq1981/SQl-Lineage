@@ -28,7 +28,7 @@ class LineageToDrawIO:
         id = self.__generateId__(name)
         userobj = objectify.SubElement(self.mxfile.diagram.mxGraphModel.root,"UserObject",
                                        attrib={"id":id,"name":name,"label":name})
-        mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
+        mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1","collapsed":"1"})
         objectify.SubElement(mxcell,"mxGeometry",attrib={"x":"0","y":"0","width":"295","height":"25","as":"geometry"})
         self.__addColumn__(id,name,columns)
 
@@ -38,7 +38,7 @@ class LineageToDrawIO:
             userobj=objectify.SubElement(self.mxfile.diagram.mxGraphModel.root, "UserObject",
                                  attrib={"id": id, "name": column,"label":column})
             mxcell = objectify.SubElement(userobj, "mxCell",
-                                          attrib={"style": self.columnStyle, "vertex": "1", "parent":tableId})
+                                          attrib={"style": self.columnStyle, "vertex": "1", "parent":tableId,"collapsed":"1"})
             objectify.SubElement(mxcell, "mxGeometry", attrib={"width": "145", "height": "25", "as": "geometry"})
 
 
@@ -72,7 +72,9 @@ class LineageToDrawIO:
         objectify.deannotate(self.mxfile, cleanup_namespaces=True)
         gg = etree.tostring(self.mxfile,pretty_print=True)
         return gg.decode("utf-8")
-
+    def saveToFile(self,outFilePath,outFileName):
+        et = etree.ElementTree(self.mxfile)
+        et.write("{}/{}".format(outFilePath,outFileName),pretty_print=True)
 
 
 if __name__ == "__main__":
