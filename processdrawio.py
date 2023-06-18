@@ -140,7 +140,10 @@ def addTagToSourceColumn(mxfile,srcColumnId,destColumnObject):
     predicate = "UserObject[@id = '{}']/mxCell[@vertex='1']/..".format(srcColumnId)
     srcCol = list(mxfile.diagram.mxGraphModel.root.iterfind(predicate))
     srcCol=srcCol[0]
-    tags = srcCol.attrib["tags"]
+    if "tags" in srcCol.attrib:
+        tags = srcCol.attrib["tags"]
+    else:
+        tags = ""
     tgls = tags.split(" ")
     tgls.append("src_"+getObjName(destColumnObject))
     if len(tgls[0]) == 0:
