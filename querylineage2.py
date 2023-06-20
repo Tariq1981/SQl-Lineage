@@ -113,7 +113,7 @@ class QueryLineageAnalysis:
                 srcColumn = src[1]
                 dictColumns[srcTable].add(srcColumn)
         for tableName in dictColumns.keys():
-            lin.addTable(tableName,list(dictColumns[tableName]))
+            lin.addTable(tableName,list(sorted(dictColumns[tableName])))
 
         for relation in tempRelations.keys():
             tgtTable = relation[0]
@@ -835,8 +835,8 @@ if __name__ == "__main__":
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
     ln.generateDrawIOXML("shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                         "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
-                        "edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;html=1;curved=1;strokeWidth=2;flowAnimation=0;gradientColor=#b3b3b3;strokeColor=#000000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;noEdgeStyle=1;orthogonal=1;",
-                         "./","output.drawio",True)
+                        "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
+                         "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",True)
     """
     We need to find solution for select with union 
     """
