@@ -77,13 +77,22 @@ def setStyle(columnObj,stylesDict):
     for st in stList:
         keyval = st.split("=")
         if len(keyval) < 2:
-            continue
-        stDict[keyval[0]]=keyval[1]
+            stDict[keyval[0]]=""
+        else:
+            stDict[keyval[0]]=keyval[1]
     for key in stylesDict.keys():
         stDict[key] = stylesDict[key]
     strStyle = ""
     for key in stDict.keys():
-        strStyle+="{}={};".format(key,stDict[key])
+        if key == "noEdgeStyle":
+            continue
+        elif key == "edgeStyle":
+            strStyle += "{}={};".format(key, "entityRelationEdgeStyle")
+            continue
+        elif len(stDict[key]) == 0:
+            strStyle += "{};".format(key)
+        else:
+            strStyle+="{}={};".format(key,stDict[key])
 
     columnObj.mxCell.attrib["style"] = strStyle
     return columnObj
@@ -97,6 +106,12 @@ def createAction(destColName,normStyles,selStyles):
     show_sel    = '{{"show":{{"tags":["sel_{}"]}}}}'.format(destColName)
     hide_norm   = '{{"hide":{{"tags":["norm_{}"]}}}}'.format(destColName)
     hide_sel    = '{{"hide":{{"tags":["sel_{}"]}}}}'.format(destColName)
+
+    show_norm_arrows = '{"show":{"tags":["norm_arrows"]}}'
+    show_sel_arrows = '{"show":{"tags":["sel_arrows"]}}'
+    hide_norm_arrows = '{"hide":{"tags":["norm_arrows"]}}'
+    hide_sel_arrows = '{"hide":{"tags":["sel_arrows"]}}'
+
     style_norm = []
     for key in normStyles.keys():
         temp = '{{"style":{{"tags":["src_{}"],"key":"{}","value":"{}"}}}}'.format(destColName,key,normStyles[key])
@@ -109,8 +124,8 @@ def createAction(destColName,normStyles,selStyles):
         style_sel.append(temp)
     final_sel_style = ",".join(style_sel)
 
-    action_show_norm = 'data:action/json,{{"actions":[{},{},{}]}}'.format(show_norm,hide_sel,final_norm_style)
-    action_show_sel = 'data:action/json,{{"actions":[{},{},{}]}}'.format(show_sel, hide_norm, final_sel_style)
+    action_show_norm = 'data:action/json,{{"actions":[{},{},{},{},{}]}}'.format(show_norm,show_norm_arrows,hide_sel,hide_sel_arrows,final_norm_style)
+    action_show_sel = 'data:action/json,{{"actions":[{},{},{},{}]}}'.format(show_sel, hide_norm,hide_norm_arrows, final_sel_style)
     return (action_show_norm,action_show_sel)
 
 
@@ -158,15 +173,17 @@ def duplicateEdgesForColumn(mxfile,columnObject):
         addTagToSourceColumn(mxfile,srcId,columnObject)
         elem = deepcopy(edge)
         elem.attrib["id"] = "cloned_" + elem.attrib["id"]
-        elem.attrib["tags"] = "sel_" + getObjName(columnObject)
-        edge.attrib["tags"] = "norm_" + getObjName(columnObject)
+        elem.attrib["tags"] = "sel_" + getObjName(columnObject)+" sel_arrows"
+        edge.attrib["tags"] = "norm_" + getObjName(columnObject)+" norm_arrows"
         elem = setStyle(elem, {"strokeColor": "#f51919"})
+        edge = setStyle(edge, {"strokeColor": "#000000"})
         elem.mxCell.attrib['visible'] = "0"
         edge.mxCell.attrib['visible'] = "1"
         elem.mxCell.attrib["target"] = "cloned_"+edge.mxCell.attrib["target"]
         #mxfile.diagram.mxGraphModel.root.append(elem)
         mxfile.diagram.mxGraphModel.root.insert(mxfile.diagram.mxGraphModel.root.index(edge) + 1, elem)
     return mxfile
+
 
 ## wrap edge into UserObject before duplicating
 
