@@ -55,7 +55,8 @@ class QueryLineageAnalysis:
                 result = DDLParser(ddl).run(output_mode="bigquery")
                 for table in result:
                     for column in table['columns']:
-                        self.tablesSet[table['table_name']].add(column['name'])
+                        tableName = table['table_name'].replace("`","").upper()
+                        self.tablesSet[tableName].add(column['name'].upper())
 
 
     def createGraphviz(self,entryTableName,templateFullPath,templateFileName,useFiltered=False):
@@ -64,7 +65,7 @@ class QueryLineageAnalysis:
         usedT = self.usedTables
         if useFiltered and len(self.usedTablesFiltered) > 0:
             usedT = self.usedTablesFiltered
-
+        """
         for table in self.tablesSet.keys():
             if table not in usedT:
                 continue
@@ -73,10 +74,27 @@ class QueryLineageAnalysis:
             if not tableHeaderColor:
                 tableHeaderColor = self.DEFAULT_TABLE_HEADER
             self.diagram.createNode(tableHeaderColor,table,list(self.tablesSet[table]))
+        """
 
         tempRelations = self.relationsSet
         if useFiltered and len(self.relationsSetNew.keys()):
             tempRelations = self.relationsSetNew
+
+        dictColumns = defaultdict(set)
+        for relation in tempRelations.keys():
+            tgtTable = relation[0]
+            tgtColumn = relation[1]
+            dictColumns[tgtTable].add(tgtColumn)
+            for src in tempRelations[relation]:
+                srcTable = src[0]
+                srcColumn = src[1]
+                dictColumns[srcTable].add(srcColumn)
+        for tableName in dictColumns.keys():
+            db = self.DBTableLookup[tableName]
+            tableHeaderColor = self.__getConfigItem__('DB_COLOR', db)
+            if not tableHeaderColor:
+                tableHeaderColor = self.DEFAULT_TABLE_HEADER
+            self.diagram.createNode(tableHeaderColor, tableName, sorted(list(dictColumns[tableName])))
 
         for relation in tempRelations.keys():
             tgtTable = relation[0]
@@ -592,13 +610,15 @@ class QueryLineageAnalysis:
         ls = []
         for f in fromJoin:
             if f.parent_select == parent_sel:
-                if isinstance(f, exp.From) and isinstance(f.expressions[0], exp.Table):
+                if isinstance(f, exp.From) and len(f.expressions) > 0 and isinstance(f.expressions[0], exp.Table):
                     ls.extend(ddlList[f.expressions[0].this.alias_or_name.upper()])
+                elif isinstance(f, exp.From) and isinstance(f.this, exp.Table):
+                    ls.extend(ddlList[f.this.alias_or_name.upper()])
                 elif isinstance(f, exp.Join) and isinstance(f.this, exp.Join):
                     ls.extend(ddlList[f.this.alias_or_name.upper()])
                 else:
                     fromObj = None
-                    if isinstance(f, exp.From):
+                    if isinstance(f, exp.From) and len(f.expressions) > 0:
                         fromObj = f.expressions[0]
                     else:
                         fromObj = f.this
@@ -827,16 +847,16 @@ class QueryLineageAnalysis:
 if __name__ == "__main__":
     frf="\nsfsfd\nsdfsd\n".strip()
     #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
-    ln = QueryLineageAnalysis("./", None, "./")
-    ln.getLineage("Test")
-    ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
+    ln = QueryLineageAnalysis("./", "./DDL", "./")
+    ln.getLineage("f_customer_agreement_base_semantic_d")
+    ln.createfilteredRelations("F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
     ln.createGraphviz("Test","./",None,True)
     ln.writeGraphvizToPNG("Tab4.png")
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
     ln.generateDrawIOXML("shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                         "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                         "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                         "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",True)
+                         "./","F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D.drawio",True)
     """
     We need to find solution for select with union 
     """
