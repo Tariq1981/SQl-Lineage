@@ -24,22 +24,26 @@ class LineageToDrawIO:
         result = hashlib.md5(name.encode())
         return result.hexdigest()
 
-    def addTable(self,name,columns):
+    def addTable(self,name,columns,x=0,y=0,width=295,headerheight=25):
         id = self.__generateId__(name)
         userobj = objectify.SubElement(self.mxfile.diagram.mxGraphModel.root,"UserObject",
                                        attrib={"id":id,"name":name,"label":name})
-        mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1","collapsed":"1"})
-        objectify.SubElement(mxcell,"mxGeometry",attrib={"x":"0","y":"0","width":"295","height":"25","as":"geometry"})
-        self.__addColumn__(id,name,columns)
+        mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
+        objectify.SubElement(mxcell,"mxGeometry",attrib={"x":str(x),"y":str(y),"width":str(width),
+                                                         "height":str(headerheight),"as":"geometry"})
+        self.__addColumn__(id,name,columns,headerheight)
 
-    def __addColumn__(self,tableId,tablename,columnsList):
+    def __addColumn__(self,tableId,tablename,columnsList,itemHeight):
+        y = itemHeight
         for column in columnsList:
             id = self.__generateId__(tablename+"_"+column)
             userobj=objectify.SubElement(self.mxfile.diagram.mxGraphModel.root, "UserObject",
                                  attrib={"id": id, "name": column,"label":column})
             mxcell = objectify.SubElement(userobj, "mxCell",
-                                          attrib={"style": self.columnStyle, "vertex": "1", "parent":tableId,"collapsed":"1"})
-            objectify.SubElement(mxcell, "mxGeometry", attrib={"width": "145", "height": "25", "as": "geometry"})
+                                          attrib={"style": self.columnStyle, "vertex": "1", "parent":tableId})
+            objectify.SubElement(mxcell, "mxGeometry", attrib={"y":str(y),"width": "295",
+                                                               "height": str(itemHeight), "as": "geometry"})
+            y+=25
 
 
     def addTag(self,id,tag):

@@ -70,7 +70,7 @@ def duplicateColumns(mxfile,columnsList):
 
 
 
-def setStyle(columnObj,stylesDict):
+def setStyle(columnObj,stylesDict,removeEdge=True):
     style = columnObj.mxCell.attrib["style"]
     stList = style[:-1].split(";")
     stDict = {}
@@ -84,9 +84,9 @@ def setStyle(columnObj,stylesDict):
         stDict[key] = stylesDict[key]
     strStyle = ""
     for key in stDict.keys():
-        if key == "noEdgeStyle":
+        if key == "noEdgeStyle" and removeEdge:
             continue
-        elif key == "edgeStyle":
+        elif key == "edgeStyle" and removeEdge:
             strStyle += "{}={};".format(key, "entityRelationEdgeStyle")
             continue
         elif len(stDict[key]) == 0:
@@ -166,7 +166,7 @@ def addTagToSourceColumn(mxfile,srcColumnId,destColumnObject):
     srcCol.attrib["tags"] = " ".join(tgls)
 
 
-def duplicateEdgesForColumn(mxfile,columnObject):
+def duplicateEdgesForColumn(mxfile,columnObject,removeEdge=True):
     edges = list(getEdgeListTargetColumn(mxfile,columnObject))
     for edge in edges:
         srcId = edge.mxCell.attrib["source"]
@@ -175,8 +175,8 @@ def duplicateEdgesForColumn(mxfile,columnObject):
         elem.attrib["id"] = "cloned_" + elem.attrib["id"]
         elem.attrib["tags"] = "sel_" + getObjName(columnObject)+" sel_arrows"
         edge.attrib["tags"] = "norm_" + getObjName(columnObject)+" norm_arrows"
-        elem = setStyle(elem, {"strokeColor": "#f51919"})
-        edge = setStyle(edge, {"strokeColor": "#000000"})
+        elem = setStyle(elem, {"strokeColor": "#f51919"},removeEdge=removeEdge)
+        edge = setStyle(edge, {"strokeColor": "#000000"},removeEdge=removeEdge)
         elem.mxCell.attrib['visible'] = "0"
         edge.mxCell.attrib['visible'] = "1"
         elem.mxCell.attrib["target"] = "cloned_"+edge.mxCell.attrib["target"]
@@ -194,22 +194,19 @@ def duplicateEdgesForColumn(mxfile,columnObject):
     """
 
 if __name__ == "__main__":
-    with open("F_SUBSCRIBER_BASE_SEMANTIC_D.drawio") as file:
+    with open("F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D.drawio") as file:
         xlstr = file.read()
 
     mxfile = objectify.fromstring(bytes(xlstr,'utf-8'))
-    obj = getTargetTableObject(mxfile,"F_SUBSCRIBER_BASE_SEMANTIC_D")
+    obj = getTargetTableObject(mxfile,"F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D")
     lsColumns = getTargetColumnsObject(mxfile,obj)
     mxfile = duplicateColumns(mxfile,lsColumns)
     for col in lsColumns:
 
-        mxfile = duplicateEdgesForColumn(mxfile,col)
+        mxfile = duplicateEdgesForColumn(mxfile,col,removeEdge=False)
 
     et = etree.ElementTree(mxfile)
     et.write("output.drawio",pretty_print=True)
-    print(str(["d","ss"]))
-    fd="HGR"
-    print(fd[:-1])
 
 
 

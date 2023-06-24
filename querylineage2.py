@@ -109,6 +109,63 @@ class QueryLineageAnalysis:
     def writeGraphvizToPNG(self,fullPath):
         self.diagram.saveGraphAsPNG(fullPath)
 
+
+    def generateDrawIOXMLLayout(self,
+                                targetTableName,
+                                tableStyle,
+                                columnStyle,
+                                edgeStyle,
+                                outputPath,
+                                outputFileName,
+                                srcfactorSpace=2,
+                                srcTgtSpaceFactor=4,
+                                distinceSrcTgt=200,
+                                itemHieght=25,
+                                useFiltered=False):
+        """Set x and y based on if it is source or target sources on the let and target on the right
+        updateteh xml creation to accept x,y,width and height
+        """
+        tempRelations = self.relationsSet
+        if useFiltered and len(self.relationsSetNew.keys()) > 0:
+            tempRelations = self.relationsSetNew
+        lin = LineageToDrawIO(tableStyle, columnStyle, edgeStyle)
+        totalColumns = 0
+        dictColumns = defaultdict(set)
+        for relation in tempRelations.keys():
+            tgtTable = relation[0]
+            tgtColumn = relation[1]
+            dictColumns[tgtTable].add(tgtColumn)
+            totalColumns+=1
+            for src in tempRelations[relation]:
+                srcTable = src[0]
+                srcColumn = src[1]
+                dictColumns[srcTable].add(srcColumn)
+                totalColumns += 1
+
+        totalColumns+=len(dictColumns.keys())  ## number of tables as headers
+        previousSrcTableEndX = 0
+        previousSrcTableEndY = 0
+        for tableName in dictColumns.keys():
+            if tableName == targetTableName:
+                srcColumns = totalColumns - len(dictColumns[tableName])-1
+                intial_y = int(srcColumns/2) *itemHieght
+                y = intial_y - int(intial_y/2)
+                lin.addTable(tableName, list(sorted(dictColumns[tableName])),
+                             distinceSrcTgt*srcTgtSpaceFactor, y)
+            else:
+                lin.addTable(tableName, list(sorted(dictColumns[tableName])),
+                             previousSrcTableEndX,previousSrcTableEndY)
+                previousSrcTableEndY+= ((srcfactorSpace+len(dictColumns[tableName])) * itemHieght)
+
+        for relation in tempRelations.keys():
+            tgtTable = relation[0]
+            tgtColumn = relation[1]
+            for src in tempRelations[relation]:
+                srcTable = src[0]
+                srcColumn = src[1]
+                lin.addEdge(srcTable, srcColumn, tgtTable, tgtColumn)
+        lin.saveToFile(outputPath, outputFileName)
+
     def generateDrawIOXML(self,
                           tableStyle,
                           columnStyle,
@@ -853,10 +910,11 @@ if __name__ == "__main__":
     ln.createGraphviz("Test","./",None,True)
     ln.writeGraphvizToPNG("Tab4.png")
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
-    ln.generateDrawIOXML("shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
-                        "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
-                        "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                         "./","F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D.drawio",True)
+    ln.generateDrawIOXMLLayout("F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D",
+                               "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
+                               "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
+                               "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
+                               "./","F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D.drawio",useFiltered=True)
     """
     We need to find solution for select with union 
     """
