@@ -38,6 +38,7 @@ class QueryLineageAnalysis:
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
         self.varNames = set()
+        self.pivotColumn = defaultdict()
         self.config = configparser.SafeConfigParser()
         self.__readConfigFile__()
         self.__parseDDL__()
@@ -394,6 +395,7 @@ class QueryLineageAnalysis:
 
     def __getSQLLineage__(self,sqlState, ddlList):
         sqlObbj = parse_one(sqlState, "bigquery")
+        self.getPivotColumnsToRealColumn(sqlObbj)
         (targTable,DBName) = self.__getTargetTable__(sqlObbj)
         if DBName:
             self.DBTableLookup[targTable] = DBName
@@ -418,6 +420,24 @@ class QueryLineageAnalysis:
                     }
                 )
         return ls
+    def getPivotColumnsToRealColumn(self,sqlObj):
+        """
+        self.PV[ColName] = ColObj
+        name_kpiin the di
+        """
+
+        pv = list(sqlObj.find_all(exp.Pivot))
+        if len(pv) == 0:
+            return
+        for ex in pv[0].expressions:
+            for field in pv[0].args['field'].expressions:
+                key = []
+                if len(ex.alias_or_name) > 0:
+                    key.append(exp.alias_or_name)
+                key.append(field.alias_or_name)
+                self.pivotColumn["_".join(key).upper()] = ex
+
+
 
     def __getSourceColumn__(self,ind, col, sqlObj, ddlList):
         """
@@ -438,7 +458,7 @@ class QueryLineageAnalysis:
                 else:
                     (colInd,colObj) = self.__getColumnByNameFromSelectInd__(sel, col)
                 if not colObj:
-                    return []
+                    continue
                 colsls = self.__getColTableAliasList__(colObj)
 
                 frJ = list(sel.find_all(exp.Subquery, exp.Table))
@@ -543,11 +563,11 @@ class QueryLineageAnalysis:
                 for c in cols:
                     if c.alias_or_name.upper() == colName:
                         return col
-
-
-            #if col.alias_or_name.upper() == colName:
-            #    return col
+        if self.pivotColumn:
+            if colName in self.pivotColumn:
+                return self.pivotColumn[colName]
         return None
+
     def __getColumnByNameFromSelectInd__(self,sel, colName):
         ind = 0
         for col in sel.selects:
@@ -617,7 +637,7 @@ class QueryLineageAnalysis:
 
     def __getTargetTable__(self,sqllotObj):
         tableName = None
-        DBName = None
+        DBName = "VFPT_DH_LAKE_EDW_STAGING_S"
         if isinstance(sqllotObj, exp.Create) or isinstance(sqllotObj, exp.Insert):
             current = sqllotObj.this
             while current and not isinstance(current, exp.Table):
@@ -905,16 +925,16 @@ if __name__ == "__main__":
     frf="\nsfsfd\nsdfsd\n".strip()
     #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
     ln = QueryLineageAnalysis("./", "./DDL", "./")
-    ln.getLineage("f_customer_agreement_base_semantic_d")
-    ln.createfilteredRelations("F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
+    ln.getLineage("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM")
+    ln.createfilteredRelations("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM",["VFPT_DH_LAKE_EDW_STAGING_S"])
     ln.createGraphviz("Test","./",None,True)
     ln.writeGraphvizToPNG("Tab4.png")
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
-    ln.generateDrawIOXMLLayout("F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D",
+    ln.generateDrawIOXMLLayout("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM",
                                "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                                "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                                "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                               "./","F_CUSTOMER_AGREEMENT_BASE_SEMANTIC_D.drawio",useFiltered=True)
+                               "./","F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM.drawio",useFiltered=True)
     """
     We need to find solution for select with union 
     """
