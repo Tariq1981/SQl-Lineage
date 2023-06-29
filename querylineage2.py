@@ -26,9 +26,10 @@ class QueryLineageAnalysis:
     CONFIG_FILE_NAME = "lineage.config"
     DEFAULT_TABLE_HEADER = "#96be5c"
 
-    def __init__(self, sqlPath, DDLPath, configPath):
+    def __init__(self, sqlPath, DDLPath, configPath,defaultDB=""):
         self.sqlPath = sqlPath
         self.DDLPath = DDLPath
+        self.defaultDB = defaultDB
         self.configPath = configPath
         self.tablesSet = defaultdict(set)
         self.relationsSet = defaultdict(set)
@@ -149,8 +150,8 @@ class QueryLineageAnalysis:
         for tableName in dictColumns.keys():
             if tableName == targetTableName:
                 srcColumns = totalColumns - len(dictColumns[tableName])-1
-                intial_y = int(srcColumns/2) *itemHieght
-                y = intial_y - int(intial_y/2)
+                intial_y = int(srcColumns/4) *itemHieght
+                y = intial_y - int(((len(dictColumns[tableName])+1)*itemHieght) /4)
                 lin.addTable(tableName, list(sorted(dictColumns[tableName])),
                              distinceSrcTgt*srcTgtSpaceFactor, y)
             else:
@@ -334,14 +335,15 @@ class QueryLineageAnalysis:
             #result = LineageRunner(str(lsff), verbose=True)
             #cols_lin = result.get_column_lineage(exclude_subquery=False)
 
-            lin = self.__getSQLLineage__(str(lsff), self.tablesSet)
-            with open('lin.txt','w') as ff:
+            lin = self.__getSQLLineage__(lsff, self.tablesSet)
+            """
+            with open('lin_{}.txt'.format(lin[0]['TargetTable']),'w') as ff:
                 for l in lin:
                     ff.write(str(l))
                     ff.write('\n')
-            with open('query.txt','w') as ff:
+            with open('query_{}.txt'.format(lin[0]['TargetTable']),'w') as ff:
                 ff.write(str(lsff))
-
+            """
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
@@ -403,6 +405,8 @@ class QueryLineageAnalysis:
         ls = []
         for ind in range(0, len(targCols)):
             srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
+            if len(srcColTable) == 0 and isinstance(sqlObbj, exp.Insert):
+                srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList,byName=False)
             #if isinstance(sqlObbj, exp.Insert):
             #    sels = list(sqlObbj.find_all(exp.Select))
             #    col = sels[0].selects[ind].alias_or_name.upper()
@@ -439,7 +443,7 @@ class QueryLineageAnalysis:
 
 
 
-    def __getSourceColumn__(self,ind, col, sqlObj, ddlList):
+    def __getSourceColumn__(self,ind, col, sqlObj, ddlList,byName=True):
         """
         if column has prefix so check if from with alias
         else loop on all from recorive to get columns
@@ -468,7 +472,7 @@ class QueryLineageAnalysis:
                     if len(tabl) > 0:
                         for fr in frJ:
                             if isinstance(fr, exp.Subquery) and tabl == fr.alias_or_name.upper():
-                                temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList)
+                                temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList,byName)
                                 ls.extend(temp)
                                 break
                             elif isinstance(fr, exp.Table) and \
@@ -481,7 +485,7 @@ class QueryLineageAnalysis:
                     else:
                         for fr in frJ:
                             if isinstance(fr, exp.Subquery):
-                                temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList)
+                                temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList,byName)
                                 if len(temp) > 0:
                                     ls.extend(temp)
                                     break
@@ -498,9 +502,16 @@ class QueryLineageAnalysis:
                             if flagFound:
                                 break
         else:
-            colObj = self.__getColumnByNameFromSelect__(sels[0], col)
-            if not colObj:
-                return []
+            if byName:
+                colObj = self.__getColumnByNameFromSelect__(sels[0], col)
+                if not colObj:
+                    return []
+            else:
+                colObj = self.__getColumnByIndexFromSelect__(sels[0],ind)
+                if not colObj:
+                    return []
+                else:
+                    byName=True
             colsls = self.__getColTableAliasList__(colObj)
 
             frJ = list(sels[0].find_all(exp.Subquery, exp.Table))
@@ -510,7 +521,7 @@ class QueryLineageAnalysis:
                 if len(tabl) > 0:
                     for fr in frJ:
                         if isinstance(fr, exp.Subquery) and tabl == fr.alias_or_name.upper():
-                            temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList)
+                            temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList,byName)
                             ls.extend(temp)
                             break
                         elif isinstance(fr, exp.Table) and \
@@ -523,7 +534,7 @@ class QueryLineageAnalysis:
                 else:
                     for fr in frJ:
                         if isinstance(fr, exp.Subquery):
-                            temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList)
+                            temp = self.__getSourceColumn__(ind, cc[1], fr.this, ddlList,byName)
                             if len(temp) > 0:
                                 ls.extend(temp)
                                 break
@@ -637,7 +648,7 @@ class QueryLineageAnalysis:
 
     def __getTargetTable__(self,sqllotObj):
         tableName = None
-        DBName = "VFPT_DH_LAKE_EDW_STAGING_S"
+        DBName = self.defaultDB
         if isinstance(sqllotObj, exp.Create) or isinstance(sqllotObj, exp.Insert):
             current = sqllotObj.this
             while current and not isinstance(current, exp.Table):
@@ -690,9 +701,9 @@ class QueryLineageAnalysis:
                 if isinstance(f, exp.From) and len(f.expressions) > 0 and isinstance(f.expressions[0], exp.Table):
                     ls.extend(ddlList[f.expressions[0].this.alias_or_name.upper()])
                 elif isinstance(f, exp.From) and isinstance(f.this, exp.Table):
-                    ls.extend(ddlList[f.this.alias_or_name.upper()])
+                    ls.extend(ddlList[f.this.name.upper()])
                 elif isinstance(f, exp.Join) and isinstance(f.this, exp.Join):
-                    ls.extend(ddlList[f.this.alias_or_name.upper()])
+                    ls.extend(ddlList[f.this.name.upper()])
                 else:
                     fromObj = None
                     if isinstance(f, exp.From) and len(f.expressions) > 0:
@@ -722,6 +733,7 @@ class QueryLineageAnalysis:
 
     def __replaceStarInScript__(self,sqlState, ddlList):
         sqlObj = parse_one(sqlState, "bigquery")
+        #print(sqlObj)
         sels = list(sqlObj.find_all(exp.Select))
 
         for sel in sels:
@@ -766,7 +778,7 @@ class QueryLineageAnalysis:
                     cc.parent = sel
                     cols.append(cc)
 
-        return sqlObj
+        return sqlObj.sql(dialect="bigquery")
 
     def __convertCreateSelectToSubuery__(self,stmt):
         """
@@ -902,7 +914,7 @@ class QueryLineageAnalysis:
         transformed_tree = sqlObj.transform(transformer)
         transformed_tree = transformed_tree.transform(transformerNoWith)
         # transformed_tree.args['with'] = None
-        return transformed_tree.sql()
+        return transformed_tree.sql(dialect="bigquey")
 
     def __readSql__(self, entrytableName):
         fullPath = "{}/{}.sql".format(self.sqlPath, entrytableName)
@@ -924,17 +936,17 @@ class QueryLineageAnalysis:
 if __name__ == "__main__":
     frf="\nsfsfd\nsdfsd\n".strip()
     #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
-    ln = QueryLineageAnalysis("./", "./DDL", "./")
-    ln.getLineage("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM")
-    ln.createfilteredRelations("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM",["VFPT_DH_LAKE_EDW_STAGING_S"])
+    ln = QueryLineageAnalysis("./", "./DDL", "./",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S")
+    ln.getLineage("F_SUBSCRIBER_BASE_SEMANTIC_D")
+    ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
     ln.createGraphviz("Test","./",None,True)
     ln.writeGraphvizToPNG("Tab4.png")
     ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
-    ln.generateDrawIOXMLLayout("F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM",
+    ln.generateDrawIOXMLLayout("F_SUBSCRIBER_BASE_SEMANTIC_D",
                                "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                                "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                                "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                               "./","F_SUBSCRIBER_COST_REPORT_SEMANTIC_AM.drawio",useFiltered=True)
+                               "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",useFiltered=True)
     """
     We need to find solution for select with union 
     """
