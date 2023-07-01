@@ -61,9 +61,13 @@ class QueryLineageAnalysis:
                         self.tablesSet[tableName].add(column['name'].upper())
 
 
-    def createGraphviz(self,entryTableName,templateFullPath,templateFileName,useFiltered=False):
-        self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
-        self.diagram.createGraph()
+    def createGraphviz(self,entryTableName,templateFullPath,templateFileName,
+                       bgColor="#FFFFFF",fontName="Arial",nodeSep=0.5,rankSep=5,useFiltered=False):
+        if templateFullPath and len(templateFullPath) > 0 and templateFileName and len(templateFileName) > 0:
+            self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
+        else:
+            self.diagram = lineageDiagram(entryTableName, None)
+        self.diagram.createGraph(bgColor,fontName,nodeSep,rankSep)
         usedT = self.usedTables
         if useFiltered and len(self.usedTablesFiltered) > 0:
             usedT = self.usedTablesFiltered
@@ -123,6 +127,8 @@ class QueryLineageAnalysis:
                                 srcTgtSpaceFactor=4,
                                 distinceSrcTgt=200,
                                 itemHieght=25,
+                                isInteractive = True,
+                                strokeColor = "#f51919",
                                 useFiltered=False):
         """Set x and y based on if it is source or target sources on the let and target on the right
         updateteh xml creation to accept x,y,width and height
@@ -166,6 +172,9 @@ class QueryLineageAnalysis:
                 srcTable = src[0]
                 srcColumn = src[1]
                 lin.addEdge(srcTable, srcColumn, tgtTable, tgtColumn)
+
+        if isInteractive:
+            lin.addInteractionToDiagram(targetTableName,strokeColor)
         lin.saveToFile(outputPath, outputFileName)
 
     def generateDrawIOXML(self,
