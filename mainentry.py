@@ -1,5 +1,5 @@
 import argparse
-from configparser import SafeConfigParser
+from configparser import ConfigParser
 from querylineage2 import QueryLineageAnalysis
 
 if __name__ == "__main__":
@@ -8,18 +8,74 @@ if __name__ == "__main__":
     and call the drawio to export to html
     """
     argParser = argparse.ArgumentParser()
+    argParser.add_argument("-p","--path",help="path for lineage_config.ini")
+    args = argParser.parse_args()
+    parser = ConfigParser()
+    parser.read("{}/{}".format(args.path, "lineage_config.ini"))
+    sqlPath = parser.get("lineage","sql_path")
+    ddlPath = parser.get("lineage","ddl_path")
+    targetTableName = parser.get("lineage","target_table_name")
+    filterTables = parser.get("lineage","is_filter_intermediate").lower()
+    dbList = parser.get("lineage", "intermediate_databases")
+    graphType = parser.get("graph", "type")
+    outPath = parser.get("graph","output_path")
+    ln = QueryLineageAnalysis(sqlPath, ddlPath, "./")
+    ln.getLineage(targetTableName.upper())
+    filter = False
+    if filterTables == "true":
+        filter = True
+        #print("Filtered !!!!!!")
+        filtedDBs = dbList.split(",")
+        filtDBs = list(map(lambda x:x.upper(),filtedDBs))
+        ln.createfilteredRelations(targetTableName.upper(), filtDBs)
+
+    if graphType.lower() == "graphviz":
+        templatePath = parser.get("graphviz", "templatepath")
+        templateFileName = parser.get("graphviz", "templateFileName")
+        bgColor = parser.get("graphviz","background_color")
+        fontName = parser.get("graphviz","font_name")
+        srcSep = float(parser.get("graphviz","vertical_sep"))
+        tgtSep = float(parser.get("graphviz", "horizontal_sep"))
+        ln.createGraphviz(targetTableName.upper(), templatePath, templateFileName,bgColor,fontName,srcSep,tgtSep ,filter)
+        ln.writeGraphvizToPNG("{}/{}.png".format(outPath, targetTableName.upper()))
+    elif graphType.lower() == "drawio":
+            tableStyle = parser.get("drawio", "table_style")
+            tableStyle = tableStyle[1:-1]
+            columnStyle = parser.get("drawio", "column_style")
+            columnStyle = columnStyle[1:-1]
+            edgeStyle = parser.get("drawio", "edge_style")
+            edgeStyle = edgeStyle[1:-1]
+            stroColor = parser.get("drawio","stroke_color")
+            sourceSpaceFactor = int(parser.get("drawio","source_space_factor"))
+            sourceTargetSpaceFactor = int(parser.get("drawio", "source_target_space"))
+            sourceTargetDist = int(parser.get("drawio", "srouce_target_distance"))
+            itemHeight = int(parser.get("drawio", "item_height"))
+            isInter = parser.get("drawio", "is_interactive")
+            isInteractive = False
+            strokColor = "#f51919"
+            if isInter and isInter.lower() == "true":
+                isInteractive = True
+                if stroColor and len(strokColor) > 0:
+                    strokColor = stroColor
+            ln.generateDrawIOXMLLayout(targetTableName.upper(), tableStyle, columnStyle, edgeStyle,
+                                       outPath, targetTableName.upper() + ".drawio", sourceSpaceFactor,
+                                       sourceTargetSpaceFactor, sourceTargetDist, itemHeight, isInteractive,
+                                       strokColor, filter)
+    """
     argParser.add_argument("-p", "--sqlpath", help="Path of the SQL scripts")
     argParser.add_argument("-d", "--ddlpath", help="Path of the DDL scripts")
     argParser.add_argument("-t", "--table", help="Table name as target for the lineage")
     argParser.add_argument("-f", "--filter", help="Filter the intermediate tables [Y/N]")
-    argParser.add_argument("-b", "--databse", help="Database names for the intermediate tables to be filtered(comma delimted)")
+    argParser.add_argument("-b", "--database", help="Database names for the intermediate tables to be filtered(comma delimted)")
     argParser.add_argument("-g", "--graph", help="Graph type[g=Graphviz,d=DrawIO]")
     argParser.add_argument("-s", "--stylespath", help="Styles file path for style.ini (table,column,edge,width,height) used by drawio")
     argParser.add_argument("-o", "--outpath", help="Output path")
     argParser.add_argument("-c", "--space", help="Space between the source tables")
     argParser.add_argument("-e", "--sourcetarget", help="space source to target factor")
-    argParser.add_argument("-h", "--distance", help="source to target space to be multiplied by srctgt factor")
+    argParser.add_argument("-u", "--distance", help="source to target space to be multiplied by srctgt factor")
     argParser.add_argument("-i", "--height", help="item height")
+    argParser.add_argument("-r", "--interactive", help="Add interactivity [Y/N]")
+    argParser.add_argument("-k", "--stroke", help="stroke color")
     args = argParser.parse_args()
 
     ln = QueryLineageAnalysis(args.sqlpath, args.ddlpath, "./")
@@ -39,9 +95,17 @@ if __name__ == "__main__":
             tableStyle = parser.get("style","table_style")
             columnStyle = parser.get("style", "column_style")
             edgeStyle = parser.get("style", "edge_style")
-            ln.generateDrawIOXMLLayout(args.table,tableStyle,columnStyle,edgeStyle,
-                                       args.outpath,args.table+".drawio",int(args.space),
-                                       int(args.sourcetarget),int(args.distance),int(args.height),filter)
+            isInteractive = False
+            strokColor = "#f51919"
+            if args.interactive.upper() == 'Y':
+                isInteractive = True
+                if args.stroke:
+                    strokColor = args.stroke
+            ln.generateDrawIOXMLLayout(args.table, tableStyle, columnStyle, edgeStyle,
+                                       args.outpath, args.table + ".drawio", int(args.space),
+                                       int(args.sourcetarget), int(args.distance), int(args.height),isInteractive,
+                                       strokColor,filter)
+    """
 
 
 
@@ -49,4 +113,4 @@ if __name__ == "__main__":
 
 
 
-    print("args.name=%s" % args.ddlpath)
+

@@ -7,16 +7,19 @@ class lineageDiagram:
         self.templateFullPath = templateFullPath
         self.graphName = graphName
 
-    def createGraph(self):
+    def createGraph(self,bgColor='#FFFFFF',fontName='Arial',nodeSep=0.5,rankSep=4):
         if self.templateFullPath and os.path.exists(self.templateFullPath):
             self.graph = pydot.graph_from_dot_file(self.templateFullPath)
         else:
             self.graph = pydot.Dot(self.graphName,
-                              graph_type='digraph',
-                              bgcolor='#FFFFFF',
-                              fontname='Arial',
-                              layout='dot',
-                              rankdir='LR')
+                                   graph_type='digraph',
+                                   bgcolor=bgColor,
+                                   fontname=fontName,
+                                   layout='dot',
+                                   rankdir='LR',
+                                   nodesep=nodeSep,
+                                   ranksep=rankSep
+                            )
 
     def createNode(self,headerColor,table,columnsList):
         if not headerColor:

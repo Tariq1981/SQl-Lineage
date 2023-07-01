@@ -1,4 +1,5 @@
 from lxml import etree, objectify
+from copy import deepcopy
 import hashlib
 class LineageToDrawIO:
     def __init__(self,tableStyle,columnStyle,edgeStyle):
@@ -79,6 +80,156 @@ class LineageToDrawIO:
     def saveToFile(self,outFilePath,outFileName):
         et = etree.ElementTree(self.mxfile)
         et.write("{}/{}".format(outFilePath,outFileName),pretty_print=True)
+
+    def __getObjName__(self,columnObject):
+        if "name" in columnObject.attrib:
+            return columnObject.attrib["name"]
+        else:
+            return columnObject.attrib["label"]
+
+    def __setStyle__(self,columnObj, stylesDict, removeEdge=True):
+        style = columnObj.mxCell.attrib["style"]
+        stList = style[:-1].split(";")
+        stDict = {}
+        for st in stList:
+            keyval = st.split("=")
+            if len(keyval) < 2:
+                stDict[keyval[0]] = ""
+            else:
+                stDict[keyval[0]] = keyval[1]
+        for key in stylesDict.keys():
+            stDict[key] = stylesDict[key]
+        strStyle = ""
+        for key in stDict.keys():
+            if key == "noEdgeStyle" and removeEdge:
+                continue
+            elif key == "edgeStyle" and removeEdge:
+                strStyle += "{}={};".format(key, "entityRelationEdgeStyle")
+                continue
+            elif len(stDict[key]) == 0:
+                strStyle += "{};".format(key)
+            else:
+                strStyle += "{}={};".format(key, stDict[key])
+        columnObj.mxCell.attrib["style"] = strStyle
+        return columnObj
+
+    def __createAction__(self,destColName, normStyles, selStyles):
+        """
+        Get list of tags and create te selct and normal action
+        """
+
+        show_norm = '{{"show":{{"tags":["norm_{}"]}}}}'.format(destColName)
+        show_sel = '{{"show":{{"tags":["sel_{}"]}}}}'.format(destColName)
+        hide_norm = '{{"hide":{{"tags":["norm_{}"]}}}}'.format(destColName)
+        hide_sel = '{{"hide":{{"tags":["sel_{}"]}}}}'.format(destColName)
+
+        show_norm_arrows = '{"show":{"tags":["norm_arrows"]}}'
+        show_sel_arrows = '{"show":{"tags":["sel_arrows"]}}'
+        hide_norm_arrows = '{"hide":{"tags":["norm_arrows"]}}'
+        hide_sel_arrows = '{"hide":{"tags":["sel_arrows"]}}'
+
+        style_norm = []
+        for key in normStyles.keys():
+            temp = '{{"style":{{"tags":["src_{}"],"key":"{}","value":"{}"}}}}'.format(destColName, key, normStyles[key])
+            style_norm.append(temp)
+
+        final_norm_style = ",".join(style_norm)
+        style_sel = []
+        for key in selStyles.keys():
+            temp = '{{"style":{{"tags":["src_{}"],"key":"{}","value":"{}"}}}}'.format(destColName, key, selStyles[key])
+            style_sel.append(temp)
+        final_sel_style = ",".join(style_sel)
+        action_show_norm = 'data:action/json,{{"actions":[{},{},{},{},{}]}}'.format(show_norm, show_norm_arrows,
+                                                                                    hide_sel, hide_sel_arrows,
+                                                                                    final_norm_style)
+        action_show_sel = 'data:action/json,{{"actions":[{},{},{},{}]}}'.format(show_sel, hide_norm, hide_norm_arrows,
+                                                                                final_sel_style)
+        return (action_show_norm, action_show_sel)
+
+    def __duplicateColumns__(self, columnsList):
+        for col in columnsList:
+            elem = deepcopy(col)
+            elem.attrib["id"] = "cloned_" + elem.attrib["id"]
+
+            elem.attrib["tags"] = "sel_" + self.__getObjName__(elem)
+            col.attrib["tags"] = "norm_" + self.__getObjName__(elem)
+
+            elem.mxCell.attrib['visible'] = "0"
+            col.mxCell.attrib['visible'] = "1"
+
+            elem = self.__setStyle__(elem, {"gradientColor": "#ffa500"})
+
+            (normAction, selAction) = self.__createAction__(self.__getObjName__(elem), {"gradientColor": "#b3b3b3"},
+                                                   {"gradientColor": "#ffa500"})
+            elem.attrib["link"] = normAction
+            col.attrib["link"] = selAction
+            # par = col.getparent()
+            self.mxfile.diagram.mxGraphModel.root.insert(self.mxfile.diagram.mxGraphModel.root.index(col) + 1, elem)
+            # mxfile.diagram.mxGraphModel.root.append(elem)
+        return self.mxfile
+
+    def __getEdgeListTargetColumn__(self, columnObject):
+        colId = columnObject.attrib["id"]
+        predicate = "UserObject/mxCell[@edge='1'][@target='{}']/..".format(colId)
+        edges = self.mxfile.diagram.mxGraphModel.root.iterfind(predicate)
+        return edges
+
+    def __addTagToSourceColumn__(self, srcColumnId, destColumnObject):
+        predicate = "UserObject[@id = '{}']/mxCell[@vertex='1']/..".format(srcColumnId)
+        srcCol = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
+        srcCol = srcCol[0]
+        if "tags" in srcCol.attrib:
+            tags = srcCol.attrib["tags"]
+        else:
+            tags = ""
+        tgls = tags.split(" ")
+        tgls.append("src_" + self.__getObjName__(destColumnObject))
+        if len(tgls[0]) == 0:
+            tgls.pop(0)
+        srcCol.attrib["tags"] = " ".join(tgls)
+
+    def __duplicateEdgesForColumn__(self, columnObject, removeEdge=True,selectedStrokCol="#f51919"):
+        edges = list(self.__getEdgeListTargetColumn__(columnObject))
+        for edge in edges:
+            srcId = edge.mxCell.attrib["source"]
+            self.__addTagToSourceColumn__(srcId, columnObject)
+            elem = deepcopy(edge)
+            elem.attrib["id"] = "cloned_" + elem.attrib["id"]
+            elem.attrib["tags"] = "sel_" + self.__getObjName__(columnObject) + " sel_arrows"
+            edge.attrib["tags"] = "norm_" + self.__getObjName__(columnObject) + " norm_arrows"
+            elem = self.__setStyle__(elem, {"strokeColor": selectedStrokCol}, removeEdge=removeEdge)
+            edge = self.__setStyle__(edge, {"strokeColor": "#000000"}, removeEdge=removeEdge)
+            elem.mxCell.attrib['visible'] = "0"
+            edge.mxCell.attrib['visible'] = "1"
+            elem.mxCell.attrib["target"] = "cloned_" + edge.mxCell.attrib["target"]
+            # mxfile.diagram.mxGraphModel.root.append(elem)
+            self.mxfile.diagram.mxGraphModel.root.insert(self.mxfile.diagram.mxGraphModel.root.index(edge) + 1, elem)
+        return self.mxfile
+
+    def __getTargetColumnsObject__(self, targetTableObj):
+        id = targetTableObj.attrib["id"]
+        predicate = "UserObject/mxCell[@vertex='1'][@parent='{}']/..".format(id)
+        cols = self.mxfile.diagram.mxGraphModel.root.iterfind(predicate)
+        return list(cols)
+
+    def __getTargetTableObject__(self,targetName):
+        for obj in self.mxfile.diagram.mxGraphModel.root.iterchildren(tag='UserObject'):
+            if "vertex" in obj.mxCell.attrib and obj.mxCell.attrib['vertex'] == "1":
+                if "name" in obj.attrib:
+                    if obj.attrib['name'] == targetName:
+                        return obj
+                else:
+                    if obj.attrib['label'] == targetName:
+                        return obj
+        return None
+
+
+    def addInteractionToDiagram(self,targetName,selStrokCol="#f51919"):
+        obj = self.__getTargetTableObject__(targetName)
+        lsColumns = self.__getTargetColumnsObject__(obj)
+        self.mxfile = self.__duplicateColumns__(lsColumns)
+        for col in lsColumns:
+            self.mxfile = self.__duplicateEdgesForColumn__(col, removeEdge=False,selectedStrokCol=selStrokCol)
 
 
 if __name__ == "__main__":
