@@ -8,10 +8,10 @@ if __name__ == "__main__":
     and call the drawio to export to html
     """
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("-p","--path",help="path for lineage_config.ini")
+    argParser.add_argument("-p","--path",help="full path for lineage_config.ini including filename")
     args = argParser.parse_args()
     parser = ConfigParser()
-    parser.read("{}/{}".format(args.path, "lineage_config.ini"))
+    parser.read(args.path)
     sqlPath = parser.get("lineage","sql_path")
     ddlPath = parser.get("lineage","ddl_path")
     targetTableName = parser.get("lineage","target_table_name")
