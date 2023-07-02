@@ -791,7 +791,7 @@ class QueryLineageAnalysis:
         transformed_tree = sqlObj.transform(transformer)
         transformed_tree = transformed_tree.transform(transformerNoWith)
         # transformed_tree.args['with'] = None
-        return transformed_tree.sql(dialect="bigquey")
+        return transformed_tree.sql(dialect="bigquery")
 
     def __readSql__(self, entrytableName):
         fullPath = "{}/{}.sql".format(self.sqlPath, entrytableName)
