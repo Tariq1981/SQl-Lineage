@@ -22,15 +22,11 @@ class lineageDiagram:
                             )
 
     def createNode(self,headerColor,table,columnsList):
-        if not headerColor:
-            headerColor = "#96be5c"
         label = self.__createNodeLabel__(headerColor,table,columnsList)
         tableNode = pydot.Node(table, label=label,color="#FFFFFF",shape="plain")
         self.graph.add_node(tableNode)
 
     def createEdge(self,edgeColor,srcTable,srcColmn,tgtTable,tgtColumn):
-        if not edgeColor:
-            edgeColor = "#aeaeae"
         tableEdge = pydot.Edge("{}:{}".format(srcTable,srcColmn),
                                "{}:{}".format(tgtTable,tgtColumn),
                                color=edgeColor)
@@ -38,16 +34,20 @@ class lineageDiagram:
 
     def saveGraphAsPNG(self,fullFileNamePath):
         prts=fullFileNamePath.split(".")
-        self.graph.write_raw(prts[0]+".dot")
-        self.graph.write_svg(prts[0] + ".svg")
         self.graph.write_png(fullFileNamePath)
+
+    def saveGraphAsSVG(self,fullFileNamePath):
+        prts = fullFileNamePath.split(".")
+        self.graph.write_svg(prts[0] + ".svg")
+
+    def saveGraphAsDOT(self,fullFileNamePath):
+        prts = fullFileNamePath.split(".")
+        self.graph.write_raw(prts[0]+".dot")
 
     def __createNodeLabel__(self,headerColor,table,columnsList):
         label = '<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">' \
                 '<th > <td bgcolor="{}"><font face="Arial" color="#FFFFFF">{}</font></td> </th>'.format(headerColor,table)
         for column in columnsList:
             label = label + '<tr> <td bgcolor="#EEEEEE" align="left" port="{}"><font face="Arial">{}</font></td> </tr>'.format(column,column)
-
         label = label + '</table>>'
-
         return label

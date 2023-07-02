@@ -23,14 +23,13 @@ Queries in the path with name as target table + .sql
 
 
 class QueryLineageAnalysis:
-    CONFIG_FILE_NAME = "lineage.config"
     DEFAULT_TABLE_HEADER = "#96be5c"
+    DEFAULT_EDGE = "#aeaeae"
 
-    def __init__(self, sqlPath, DDLPath, configPath,defaultDB=""):
+    def __init__(self, sqlPath, DDLPath, defaultDB=""):
         self.sqlPath = sqlPath
         self.DDLPath = DDLPath
         self.defaultDB = defaultDB
-        self.configPath = configPath
         self.tablesSet = defaultdict(set)
         self.relationsSet = defaultdict(set)
         self.relationsSetNew = defaultdict(list)
@@ -41,7 +40,6 @@ class QueryLineageAnalysis:
         self.varNames = set()
         self.pivotColumn = defaultdict()
         self.config = configparser.SafeConfigParser()
-        self.__readConfigFile__()
         self.__parseDDL__()
 
     def __parseDDL__(self):
@@ -62,7 +60,8 @@ class QueryLineageAnalysis:
 
 
     def createGraphviz(self,entryTableName,templateFullPath,templateFileName,
-                       bgColor="#FFFFFF",fontName="Arial",nodeSep=0.5,rankSep=5,useFiltered=False):
+                       bgColor="#FFFFFF",fontName="Arial",nodeSep=0.5,rankSep=5,headerColor="#96be5c",
+                       edgStrokColor="#aeaeae",useFiltered=False):
         if templateFullPath and len(templateFullPath) > 0 and templateFileName and len(templateFileName) > 0:
             self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
         else:
@@ -71,16 +70,6 @@ class QueryLineageAnalysis:
         usedT = self.usedTables
         if useFiltered and len(self.usedTablesFiltered) > 0:
             usedT = self.usedTablesFiltered
-        """
-        for table in self.tablesSet.keys():
-            if table not in usedT:
-                continue
-            db = self.DBTableLookup[table]
-            tableHeaderColor = self.__getConfigItem__('DB_COLOR',db)
-            if not tableHeaderColor:
-                tableHeaderColor = self.DEFAULT_TABLE_HEADER
-            self.diagram.createNode(tableHeaderColor,table,list(self.tablesSet[table]))
-        """
 
         tempRelations = self.relationsSet
         if useFiltered and len(self.relationsSetNew.keys()):
@@ -97,7 +86,7 @@ class QueryLineageAnalysis:
                 dictColumns[srcTable].add(srcColumn)
         for tableName in dictColumns.keys():
             db = self.DBTableLookup[tableName]
-            tableHeaderColor = self.__getConfigItem__('DB_COLOR', db)
+            tableHeaderColor = headerColor
             if not tableHeaderColor:
                 tableHeaderColor = self.DEFAULT_TABLE_HEADER
             self.diagram.createNode(tableHeaderColor, tableName, sorted(list(dictColumns[tableName])))
@@ -108,7 +97,10 @@ class QueryLineageAnalysis:
             for src in tempRelations[relation]:
                 srcTable = src[0]
                 srcColumn = src[1]
-                edgColor = self.__getConfigItem__("EDGE_COLOR","{}_{}".format(tgtTable,srcTable))
+                if edgStrokColor and len(edgStrokColor) > 0:
+                    edgColor = edgStrokColor
+                else:
+                    edgColor = self.DEFAULT_EDGE
                 self.diagram.createEdge(edgColor,srcTable,srcColumn,tgtTable,tgtColumn)
 
 
@@ -177,43 +169,6 @@ class QueryLineageAnalysis:
             lin.addInteractionToDiagram(targetTableName,strokeColor)
         lin.saveToFile(outputPath, outputFileName)
 
-    def generateDrawIOXML(self,
-                          tableStyle,
-                          columnStyle,
-                          edgeStyle,
-                          outputPath,
-                          outputFileName,
-                          useFiltered=False):
-        tempRelations = self.relationsSet
-        if useFiltered and len(self.relationsSetNew.keys()) > 0:
-            tempRelations = self.relationsSetNew
-        lin = LineageToDrawIO(tableStyle,columnStyle,edgeStyle)
-
-        dictColumns = defaultdict(set)
-        for relation in tempRelations.keys():
-            tgtTable = relation[0]
-            tgtColumn = relation[1]
-            dictColumns[tgtTable].add(tgtColumn)
-            for src in tempRelations[relation]:
-                srcTable = src[0]
-                srcColumn = src[1]
-                dictColumns[srcTable].add(srcColumn)
-        for tableName in dictColumns.keys():
-            lin.addTable(tableName,list(sorted(dictColumns[tableName])))
-
-        for relation in tempRelations.keys():
-            tgtTable = relation[0]
-            tgtColumn = relation[1]
-            for src in tempRelations[relation]:
-                srcTable = src[0]
-                srcColumn = src[1]
-                lin.addEdge(srcTable,srcColumn,tgtTable,tgtColumn)
-        lin.saveToFile(outputPath,outputFileName)
-
-
-
-
-
     def generateDrawIOCSV(self,templatePath,templateFileName,
                           tableStyleName,columnStyleName,
                           outputPath,outputFileName,
@@ -233,24 +188,7 @@ class QueryLineageAnalysis:
                 drawgen.addTable(srcTable)
                 drawgen.addColumn(srcTable,srcColumn,tgtTable,tgtColumn)
                 drawgen.addColumn(tgtTable,tgtColumn,None,None)
-                #drawgen.addColumn(srcTable,srcColumn,None,None)
-                #drawgen.addColumn(tgtTable,tgtColumn,srcTable,srcColumn)
         drawgen.generateCSVDrawIO(outputPath,outputFileName)
-
-
-
-
-
-
-
-    def __readConfigFile__(self):
-        self.config.read("{}/{}".format(self.configPath, self.CONFIG_FILE_NAME))
-
-    def __getConfigItem__(self, section, item):
-        if section in self.config and item in self.config[section]:
-            return self.config[section][item]
-        else:
-            return None
 
     def createfilteredRelations(self,targetTable,dbListExclude):
         keys = list(self.relationsSet)
@@ -273,31 +211,6 @@ class QueryLineageAnalysis:
                             ls.add(srcPair)
                             self.usedTablesFiltered.add(srcPair[0])
                 self.relationsSetNew[relation].extend(ls)
-
-
-    """
-    def filterRelations(self,targetTable,dbListExclude):
-        relationsSetNew = defaultdict(list)
-        keys = list(self.relationsSet)
-        for relation in keys:
-            tgtTable = relation[0]
-            if tgtTable == targetTable:
-                relationsSetNew[relation].extend(self.__getSourcePair__(relation,dbListExclude,targetTable))
-        return relationsSetNew
-    def __getSourcePair__(self,srcPairInput,dbListExclude,targetTable):
-        dbListExcludeSet = set(dbListExclude)
-        ls = set()
-        for srcPair in self.relationsSet[srcPairInput]:
-            if self.DBTableLookup[srcPair[0]] in dbListExcludeSet or srcPair[0] == targetTable:
-                pairs = self.__getSourcePair__(srcPair,dbListExcludeSet,targetTable)
-                ls.update(pairs)
-            else:
-                ls.add(srcPair)
-
-        return ls
-    """
-
-
 
     def isStmtOK(self,stmt):
         pp=sqlparse.parse(stmt)
@@ -331,28 +244,14 @@ class QueryLineageAnalysis:
             if len(stmt) == 0 or not self.isStmtOK(stmt):
                 continue
 
-
             sql0 = self.__removeComments__(stmt)
-            #sql0 = self.__removePartitionBy__(sql0)
             sql0 = self.__removePartitionBy2__(sql0)
             sql0 = sql0.replace("`", " ")
             sql0 = sql0.replace("-", "_")
             sql0 = self.__convertCreateSelectToSubuery__(sql0)
             sfg = self.__convertCTEtoSubqueries__(sql0)
             lsff = self.__replaceStarInScript__(sfg, self.tablesSet)
-
-            #result = LineageRunner(str(lsff), verbose=True)
-            #cols_lin = result.get_column_lineage(exclude_subquery=False)
-
             lin = self.__getSQLLineage__(lsff, self.tablesSet)
-            """
-            with open('lin_{}.txt'.format(lin[0]['TargetTable']),'w') as ff:
-                for l in lin:
-                    ff.write(str(l))
-                    ff.write('\n')
-            with open('query_{}.txt'.format(lin[0]['TargetTable']),'w') as ff:
-                ff.write(str(lsff))
-            """
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
@@ -366,7 +265,6 @@ class QueryLineageAnalysis:
         for relation in relations.keys():
             if relation not in self.relationsSet:
                 self.relationsSet[relation] = relations[relation]
-
                 tgtTable =relation[0]
                 tgtColumn = relation[1]
                 self.tablesSet[tgtTable].add(tgtColumn)
@@ -376,15 +274,6 @@ class QueryLineageAnalysis:
                     self.tablesSet[srcTable].add(srcColumn)
 
     def __getTablesColumnsRelations__(self, colLineages):
-        """
-        We need to have DDL for the tables and build dictionary key column name and value list of tables
-        Then if we have subquery try to find the tablename for the column in hand
-
-        :param colLineages:
-        :param sourcetables:
-        :param targetTables:
-        :return:
-        """
         tables = defaultdict(set)
         relations = defaultdict(set)
 
@@ -416,12 +305,6 @@ class QueryLineageAnalysis:
             srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
             if len(srcColTable) == 0 and isinstance(sqlObbj, exp.Insert):
                 srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList,byName=False)
-            #if isinstance(sqlObbj, exp.Insert):
-            #    sels = list(sqlObbj.find_all(exp.Select))
-            #    col = sels[0].selects[ind].alias_or_name.upper()
-            #    srcColTable = self.__getSourceColumn__(ind, col, sqlObbj, ddlList)
-            #else:
-            #    srcColTable = self.__getSourceColumn__(ind, targCols[ind], sqlObbj, ddlList)
 
             for i in range(0, len(srcColTable)):
                 ls.append(
@@ -433,12 +316,8 @@ class QueryLineageAnalysis:
                     }
                 )
         return ls
-    def getPivotColumnsToRealColumn(self,sqlObj):
-        """
-        self.PV[ColName] = ColObj
-        name_kpiin the di
-        """
 
+    def getPivotColumnsToRealColumn(self,sqlObj):
         pv = list(sqlObj.find_all(exp.Pivot))
         if len(pv) == 0:
             return
@@ -453,10 +332,6 @@ class QueryLineageAnalysis:
 
 
     def __getSourceColumn__(self,ind, col, sqlObj, ddlList,byName=True):
-        """
-        if column has prefix so check if from with alias
-        else loop on all from recorive to get columns
-        """
         if col in self.varNames:
             return []
         ls = []
@@ -560,7 +435,6 @@ class QueryLineageAnalysis:
 
                         if flagFound:
                             break
-
         return list(set(ls))
 
     def __getColList__(self,col):
@@ -595,13 +469,12 @@ class QueryLineageAnalysis:
                 return (ind,col)
             ind = ind+1
         return (-1,None)
+
     def __getColumnByIndexFromSelect__(self,sel, colInd):
         if colInd >= len(sel.selects):
             return None
         return sel.selects[colInd]
 
-
-    # first version explicit column mention in the select
     def __getSourceTable__(self,ind, sqlObj, ddlList):
         sels = list(sqlObj.find_all(exp.Select))
         col = sels[0].selects[ind]
@@ -790,11 +663,6 @@ class QueryLineageAnalysis:
         return sqlObj.sql(dialect="bigquery")
 
     def __convertCreateSelectToSubuery__(self,stmt):
-        """
-        Convert Create without brackets to have brackets
-        :param Stmt:
-        :return:
-        """
         if "INSERT " in "".strip():
             return stmt
         res = []
@@ -943,9 +811,7 @@ class QueryLineageAnalysis:
 
 
 if __name__ == "__main__":
-    frf="\nsfsfd\nsdfsd\n".strip()
-    #sqlPath, DDLPath, templateFullPath, templateFileName, configPath
-    ln = QueryLineageAnalysis("./", "./DDL", "./",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S")
+    ln = QueryLineageAnalysis("./", "./DDL",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S")
     ln.getLineage("F_SUBSCRIBER_BASE_SEMANTIC_D")
     ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
     ln.createGraphviz("Test","./",None,True)
@@ -956,24 +822,3 @@ if __name__ == "__main__":
                                "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                                "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
                                "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",useFiltered=True)
-    """
-    We need to find solution for select with union 
-    """
-
-    """
-    Litral orvariables values to be handled as CONSTANT we can pass list of variables to be excluded or to parse ny declare 
-    and exclude them
-    any DECLARE add to list of ecludsion.
-    see why mig_dd_ind parsed variables
-    """
-
-    """
-    Queries in the insert must have aliases same as column names of the target table
-
-    ##### REsolve if more than one subquery with same name should each one to be unique
-    """
-
-    """
-    Small defect if column found in table  so it should not searched in any other tablewithin subquery
-    """
-

@@ -19,7 +19,8 @@ if __name__ == "__main__":
     dbList = parser.get("lineage", "intermediate_databases")
     graphType = parser.get("graph", "type")
     outPath = parser.get("graph","output_path")
-    ln = QueryLineageAnalysis(sqlPath, ddlPath, "./")
+    defaultDB = parser.get("lineage","defaultDB")
+    ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB)
     ln.getLineage(targetTableName.upper())
     filter = False
     if filterTables == "true":
