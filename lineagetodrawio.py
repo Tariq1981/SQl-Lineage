@@ -32,9 +32,9 @@ class LineageToDrawIO:
         mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
         objectify.SubElement(mxcell,"mxGeometry",attrib={"x":str(x),"y":str(y),"width":str(width),
                                                          "height":str(headerheight),"as":"geometry"})
-        self.__addColumn__(id,name,columns,headerheight)
+        self.__addColumn__(id,name,columns,headerheight,width)
 
-    def __addColumn__(self,tableId,tablename,columnsList,itemHeight):
+    def __addColumn__(self,tableId,tablename,columnsList,itemHeight,itemWidth):
         y = itemHeight
         for column in columnsList:
             id = self.__generateId__(tablename+"_"+column)
@@ -42,9 +42,9 @@ class LineageToDrawIO:
                                  attrib={"id": id, "name": column,"label":column})
             mxcell = objectify.SubElement(userobj, "mxCell",
                                           attrib={"style": self.columnStyle, "vertex": "1", "parent":tableId})
-            objectify.SubElement(mxcell, "mxGeometry", attrib={"y":str(y),"width": "295",
+            objectify.SubElement(mxcell, "mxGeometry", attrib={"y":str(y),"width": str(itemWidth),
                                                                "height": str(itemHeight), "as": "geometry"})
-            y+=25
+            y+=itemHeight
 
 
     def addTag(self,id,tag):
