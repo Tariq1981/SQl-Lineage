@@ -246,8 +246,8 @@ class QueryLineageAnalysis:
 
             sql0 = self.__removeComments__(stmt)
             sql0 = self.__removePartitionBy2__(sql0)
-            sql0 = sql0.replace("`", " ")
-            sql0 = sql0.replace("-", "_")
+            #sql0 = sql0.replace("`", " ")
+            #sql0 = sql0.replace("-", "_")
             sql0 = self.__convertCreateSelectToSubuery__(sql0)
             sfg = self.__convertCTEtoSubqueries__(sql0)
             lsff = self.__replaceStarInScript__(sfg, self.tablesSet)
