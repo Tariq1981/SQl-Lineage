@@ -32,7 +32,8 @@ class QueryLineageAnalysis:
         self.defaultDB = defaultDB
         self.isDebug = isDebug
         self.debugPath = debugPath
-        self.tablesSet = defaultdict(set)
+        self.tablesSet = defaultdict(list)
+        self.tablesSetSearch = defaultdict(set)
         self.relationsSet = defaultdict(set)
         self.relationsSetNew = defaultdict(list)
         self.usedTables=set()
@@ -58,7 +59,8 @@ class QueryLineageAnalysis:
                 for table in result:
                     for column in table['columns']:
                         tableName = table['table_name'].replace("`","").upper()
-                        self.tablesSet[tableName].add(column['name'].upper())
+                        self.tablesSetSearch[tableName].add(column['name'].upper())
+                        self.tablesSet[tableName].append(column['name'].upper())
 
 
     def createGraphviz(self,entryTableName,templateFullPath,templateFileName,
@@ -229,11 +231,16 @@ class QueryLineageAnalysis:
         return False
 
     def __isDeclareAddVarName__(self,stmt):
-        stmtTok = stmt.strip().split(" ")
-        if stmtTok[0].upper() == "DECLARE":
-            self.varNames.add(stmtTok[1].upper())
-            return True
-        return False
+        stmt=sqlparse.parse(stmt.strip())
+        isDeclare= False
+        if len(stmt) > 0 and len(stmt[0].tokens) > 0 and stmt[0].tokens[0].value.upper() == "DECLARE":
+            isDeclare = True
+            for tok in stmt[0].tokens[1:]:
+                if isDeclare and isinstance(tok,Identifier):
+                    self.varNames.add(tok.value.upper())
+                    break
+        return isDeclare
+
 
     def getLineage(self, entrytableName):
         raw_sql = self.__readSql__(entrytableName)
@@ -274,18 +281,21 @@ class QueryLineageAnalysis:
     def __updateTablesRelations__(self,tables,relations):
         for table in tables.keys():
             if table not in self.tablesSet:
-                self.tablesSet[table].update(tables[table])
+                self.tablesSet[table].extend(tables[table])
+                self.tablesSetSearch[table].update(tables[table])
 
         for relation in relations.keys():
             if relation not in self.relationsSet:
                 self.relationsSet[relation] = relations[relation]
                 tgtTable =relation[0]
                 tgtColumn = relation[1]
-                self.tablesSet[tgtTable].add(tgtColumn)
+                self.tablesSet[tgtTable].append(tgtColumn)
+                self.tablesSetSearch[tgtTable].add(tgtColumn)
                 for srcPair in relations[relation]:
                     srcTable = srcPair[0]
                     srcColumn = srcPair[1]
-                    self.tablesSet[srcTable].add(srcColumn)
+                    self.tablesSetSearch[srcTable].add(srcColumn)
+                    self.tablesSet[srcTable].append(srcColumn)
 
     def __getTablesColumnsRelations__(self, colLineages):
         tables = defaultdict(set)
