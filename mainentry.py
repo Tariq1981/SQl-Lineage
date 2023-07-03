@@ -12,6 +12,13 @@ if __name__ == "__main__":
     args = argParser.parse_args()
     parser = ConfigParser()
     parser.read(args.path)
+    isDebug = False
+    deb = parser.get("lineage","debug")
+    deb_path = parser.get("lineage","debug_log")
+    if deb and deb.lower() == "true":
+        isDebug = True
+        if not deb_path:
+            deb_path = "./"
     sqlPath = parser.get("lineage","sql_path")
     ddlPath = parser.get("lineage","ddl_path")
     targetTableName = parser.get("lineage","target_table_name")
@@ -20,7 +27,7 @@ if __name__ == "__main__":
     graphType = parser.get("graph", "type")
     outPath = parser.get("graph","output_path")
     defaultDB = parser.get("lineage","defaultDB")
-    ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB)
+    ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB,isDebug,deb_path)
     ln.getLineage(targetTableName.upper())
     filter = False
     if filterTables == "true":
