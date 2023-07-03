@@ -26,10 +26,12 @@ class QueryLineageAnalysis:
     DEFAULT_TABLE_HEADER = "#96be5c"
     DEFAULT_EDGE = "#aeaeae"
 
-    def __init__(self, sqlPath, DDLPath, defaultDB=""):
+    def __init__(self, sqlPath, DDLPath, defaultDB="",isDebug=False,debugPath="./"):
         self.sqlPath = sqlPath
         self.DDLPath = DDLPath
         self.defaultDB = defaultDB
+        self.isDebug = isDebug
+        self.debugPath = debugPath
         self.tablesSet = defaultdict(set)
         self.relationsSet = defaultdict(set)
         self.relationsSetNew = defaultdict(list)
@@ -252,6 +254,18 @@ class QueryLineageAnalysis:
             sfg = self.__convertCTEtoSubqueries__(sql0)
             lsff = self.__replaceStarInScript__(sfg, self.tablesSet)
             lin = self.__getSQLLineage__(lsff, self.tablesSet)
+            if self.isDebug:
+                if len(lin) == 0:
+                    print("Query no ineage!!!!: "+lsff)
+                else:
+                    with open('{}/lin_{}.txt'.format(self.debugPath,lin[0]['TargetTable']),'w') as ff:
+                        for l in lin:
+                            ff.write(str(l))
+                            ff.write('\n')
+                    with open('{}/query_{}.txt'.format(self.debugPath,lin[0]['TargetTable']),'w') as ff:
+                        ff.write(str(lsff))
+
+
             tablesRelations = self.__getTablesColumnsRelations__(lin)
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
@@ -674,7 +688,7 @@ class QueryLineageAnalysis:
                 state = 1
             elif tok == "AS" and state == 1:
                 state = 2
-            elif tok == "SELECT" and state == 2:
+            elif (tok == "SELECT" or tok == "WITH") and state == 2:
                 res.append(" ( ")
                 state = 3
             elif tok == "(" and state == 2:
@@ -768,13 +782,17 @@ class QueryLineageAnalysis:
 
     def __convertCTEtoSubqueries__(self,sqlStmt):
         def transformer(node):
-            if isinstance(node, exp.Table) and node.name in dictCTE:
-                return parse_one("({}) AS {}".format(str(dictCTE[node.name]), node.alias_or_name), "bigquery")
+            if isinstance(node, exp.Table) and node.name.upper() in dictCTE:
+                return parse_one("({}) AS {}".format(dictCTE[node.name.upper()].sql(dialect="bigquery"), node.alias_or_name), "bigquery")
             return node
 
         def transformerNoWith(node):
             if isinstance(node, exp.Select):
                 node.args['with'] = None
+            elif isinstance(node,exp.With):
+                return None
+            if hasattr(node,"ctes"):
+                node.ctes.clear()
             return node
 
         sqlObj = parse_one(sqlStmt, "bigquery")
