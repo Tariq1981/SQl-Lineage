@@ -353,8 +353,11 @@ class QueryLineageAnalysis:
         if len(sels) == 0:
             return None
         elif isinstance(sels[0].parent,exp.Union):
+            unionParent = sels[0].parent
             colInd = -1
             for sel in sels:
+                if sel.parent != unionParent:
+                    continue
                 if colInd > -1:
                     colObj = self.__getColumnByIndexFromSelect__(sel,colInd)
                 else:
