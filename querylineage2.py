@@ -258,7 +258,7 @@ class QueryLineageAnalysis:
             if len(stmt) == 0 or not self.isStmtOK(stmt):
                 if verbose:
                     stm = stmt.split(" ")
-                    print("Statement {} starts with {} will be escaped".format(stmtIndex + 1,stm[0]))
+                    print("Statement {} starts with '{}' will be escaped".format(stmtIndex + 1,stm[0]))
                     print("Statements {}/{} has been parsed".format(stmtIndex + 1, len(statements)))
                     print("---------------------------------")
                 stmtIndex+=1
