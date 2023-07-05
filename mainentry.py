@@ -15,6 +15,10 @@ if __name__ == "__main__":
     isDebug = False
     deb = parser.get("lineage","debug")
     deb_path = parser.get("lineage","debug_log")
+    verboseStr = parser.get("lineage","verbose")
+    verbose = False
+    if verboseStr and verboseStr.lower() == "true":
+        verbose = True
     if deb and deb.lower() == "true":
         isDebug = True
         if not deb_path:
@@ -28,7 +32,7 @@ if __name__ == "__main__":
     outPath = parser.get("graph","output_path")
     defaultDB = parser.get("lineage","defaultDB")
     ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB,isDebug,deb_path)
-    ln.getLineage(targetTableName.upper())
+    ln.getLineage(targetTableName.upper(),verbose)
     filter = False
     if filterTables == "true":
         filter = True

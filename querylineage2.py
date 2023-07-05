@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+import time
 import configparser
 import re
 import sqlparse
@@ -242,15 +243,25 @@ class QueryLineageAnalysis:
         return isDeclare
 
 
-    def getLineage(self, entrytableName):
+    def getLineage(self, entrytableName,verbose=False):
         raw_sql = self.__readSql__(entrytableName)
         if not (raw_sql):
             return None
         statements = raw_sql.split(";")
+        if verbose:
+            print("Number of detected Statements: {}".format(len(statements)))
+        stmtIndex = 0
         for stmt in statements:
+            startTime = time.time()
             stmt = stmt.strip()
             self.__isDeclareAddVarName__(stmt)
             if len(stmt) == 0 or not self.isStmtOK(stmt):
+                if verbose:
+                    stm = stmt.split(" ")
+                    print("Statement {} starts with {} will be escaped".format(stmtIndex + 1,stm[0]))
+                    print("Statements {}/{} has been parsed".format(stmtIndex + 1, len(statements)))
+                    print("---------------------------------")
+                stmtIndex+=1
                 continue
 
             sql0 = self.__removeComments__(stmt)
@@ -277,6 +288,11 @@ class QueryLineageAnalysis:
             tables = tablesRelations["tables"]
             relations = tablesRelations["relations"]
             self.__updateTablesRelations__(tables, relations)
+            if verbose:
+                print("Statement {} parsed in {} seconds".format(stmtIndex+1,(time.time() - startTime)))
+                print("Statements {}/{} has been parsed".format(stmtIndex+1,len(statements)))
+                print("---------------------------------")
+            stmtIndex+=1
 
     def __updateTablesRelations__(self,tables,relations):
         for table in tables.keys():
@@ -289,13 +305,15 @@ class QueryLineageAnalysis:
                 self.relationsSet[relation] = relations[relation]
                 tgtTable =relation[0]
                 tgtColumn = relation[1]
-                self.tablesSet[tgtTable].append(tgtColumn)
-                self.tablesSetSearch[tgtTable].add(tgtColumn)
+                if tgtColumn not in self.tablesSetSearch[tgtTable]:
+                    self.tablesSet[tgtTable].append(tgtColumn)
+                    self.tablesSetSearch[tgtTable].add(tgtColumn)
                 for srcPair in relations[relation]:
                     srcTable = srcPair[0]
                     srcColumn = srcPair[1]
-                    self.tablesSetSearch[srcTable].add(srcColumn)
-                    self.tablesSet[srcTable].append(srcColumn)
+                    if srcColumn not in self.tablesSetSearch[srcTable]:
+                        self.tablesSetSearch[srcTable].add(srcColumn)
+                        self.tablesSet[srcTable].append(srcColumn)
 
     def __getTablesColumnsRelations__(self, colLineages):
         tables = defaultdict(set)
@@ -337,6 +355,15 @@ class QueryLineageAnalysis:
                         'TargetColumn': targCols[ind],
                         'SourceTable': srcColTable[i][1],
                         'SourceColumn': srcColTable[i][0]
+                    }
+                )
+            if len(srcColTable) == 0:
+                ls.append(
+                    {
+                        'TargetTable': targTable,
+                        'TargetColumn': targCols[ind],
+                        'SourceTable': 'Hardcoded/Unknown',
+                        'SourceColumn': 'Constant/Unknown'
                     }
                 )
         return ls
@@ -401,6 +428,8 @@ class QueryLineageAnalysis:
                                     ls.extend(temp)
                                     break
                             elif isinstance(fr, exp.Table):
+                                if cc[1].upper() in self.varNames:
+                                    continue
                                 if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                     ls.append((cc[1], fr.name.upper()))
                                     flagFound = True
@@ -450,6 +479,8 @@ class QueryLineageAnalysis:
                                 ls.extend(temp)
                                 break
                         elif isinstance(fr, exp.Table):
+                            if cc[1].upper() in self.varNames:
+                                continue
                             if fr.name.upper() in ddlList and cc[1].upper() in ddlList[fr.name.upper()]:
                                 ls.append((cc[1], fr.name.upper()))
                                 flagFound = True
