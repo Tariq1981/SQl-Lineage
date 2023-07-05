@@ -124,6 +124,7 @@ class QueryLineageAnalysis:
                                 srcTgtSpaceFactor=4,
                                 distinceSrcTgt=200,
                                 itemHieght=25,
+                                collapsed=False,
                                 isInteractive = True,
                                 strokeColor = "#f51919",
                                 useFiltered=False):
@@ -156,10 +157,10 @@ class QueryLineageAnalysis:
                 intial_y = int(srcColumns/4) *itemHieght
                 y = intial_y - int(((len(dictColumns[tableName])+1)*itemHieght) /4)
                 lin.addTable(tableName, list(sorted(dictColumns[tableName])),
-                             distinceSrcTgt*srcTgtSpaceFactor, y)
+                             distinceSrcTgt*srcTgtSpaceFactor, y,collapsed=collapsed)
             else:
                 lin.addTable(tableName, list(sorted(dictColumns[tableName])),
-                             previousSrcTableEndX,previousSrcTableEndY)
+                             previousSrcTableEndX,previousSrcTableEndY,collapsed=collapsed)
                 previousSrcTableEndY+= ((srcfactorSpace+len(dictColumns[tableName])) * itemHieght)
 
         for relation in tempRelations.keys():

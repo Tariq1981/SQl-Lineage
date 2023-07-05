@@ -25,11 +25,15 @@ class LineageToDrawIO:
         result = hashlib.md5(name.encode())
         return result.hexdigest()
 
-    def addTable(self,name,columns,x=0,y=0,width=295,headerheight=25):
+    def addTable(self,name,columns,x=0,y=0,width=295,headerheight=25,collapsed=False):
         id = self.__generateId__(name)
         userobj = objectify.SubElement(self.mxfile.diagram.mxGraphModel.root,"UserObject",
                                        attrib={"id":id,"name":name,"label":name})
-        mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
+        if collapsed:
+            mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
+        else:
+            mxcell = objectify.SubElement(userobj, "mxCell",attrib={"style": self.tableStyle, "vertex": "1",
+                                                                    "parent": "1","collapsed":"1"})
         objectify.SubElement(mxcell,"mxGeometry",attrib={"x":str(x),"y":str(y),"width":str(width),
                                                          "height":str(headerheight),"as":"geometry"})
         self.__addColumn__(id,name,columns,headerheight,width)

@@ -63,6 +63,10 @@ if __name__ == "__main__":
             sourceTargetDist = int(parser.get("drawio", "srouce_target_distance"))
             itemHeight = int(parser.get("drawio", "item_height"))
             isInter = parser.get("drawio", "is_interactive")
+            collStr = parser.get("drawio", "collapsed")
+            collapsed = False
+            if collStr and collStr.lower() == True:
+                collapsed = True
             isInteractive = False
             strokColor = "#f51919"
             if isInter and isInter.lower() == "true":
@@ -71,7 +75,7 @@ if __name__ == "__main__":
                     strokColor = stroColor
             ln.generateDrawIOXMLLayout(targetTableName.upper(), tableStyle, columnStyle, edgeStyle,
                                        outPath, targetTableName.upper() + ".drawio", sourceSpaceFactor,
-                                       sourceTargetSpaceFactor, sourceTargetDist, itemHeight, isInteractive,
+                                       sourceTargetSpaceFactor, sourceTargetDist, itemHeight,collapsed ,isInteractive,
                                        strokColor, filter)
     """
     argParser.add_argument("-p", "--sqlpath", help="Path of the SQL scripts")
