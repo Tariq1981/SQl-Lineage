@@ -48,7 +48,7 @@ if __name__ == "__main__":
         fontName = parser.get("graphviz","font_name")
         srcSep = float(parser.get("graphviz","vertical_sep"))
         tgtSep = float(parser.get("graphviz", "horizontal_sep"))
-        ln.createGraphviz(targetTableName.upper(), templatePath, templateFileName,bgColor,fontName,srcSep,tgtSep ,filter)
+        ln.createGraphviz(targetTableName.upper(), templatePath, templateFileName,bgColor,fontName,srcSep,tgtSep ,useFiltered=filter)
         ln.writeGraphvizToPNG("{}/{}.png".format(outPath, targetTableName.upper()))
     elif graphType.lower() == "drawio":
             tableStyle = parser.get("drawio", "table_style")
