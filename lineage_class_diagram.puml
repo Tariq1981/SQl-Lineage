@@ -1,0 +1,81 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+class QueryLineageAnalysis {
+- sqlPath
+- DDLPath
+- defaultDB
+- isDebug
+- debugPath
+- tablesSet
+- relationsSet
+- __parseDDL__()
+- __isDeclareAddVarName__()
+- __isStmtOK__()
+- __updateTablesRelations__()
+- __getTablesColumnsRelations__()
+- __getSQLLineage__()
+- __getPivotColumnsToRealColumn__()
+- __getSourceColumn__()
+- __getColList__()
+- __getColTableAliasList__()
+- __getColumnByNameFromSelect__()
+- __getColumnByNameFromSelectInd__()
+- __getColumnByIndexFromSelect__()
+- __getTargetTable__()
+- __getTargetTableColumns__()
+- __replaceStarInQuery__()
+- __replaceStarInScript__()
+- __convertCreateSelectToSubuery__()
+- __removePartitionBy2__()
+- __removeRecPrtition__()
+- __getPartial__()
+- __removeComments__()
+- __convertCTEtoSubqueries__()
+- __readSql__()
++ createGraphviz()
++ writeGraphvizToPNG()
++ generateDrawIOXMLLayout()
++ generateDrawIOCSV()
++ createfilteredRelations()
++ getLineage()
+}
+
+class LineageDiagram {
+- graphName
+- __createNodeLabel__()
++ createGraph()
++ createNode()
++ createEdge()
++ saveGraphAsPNG()
++ saveGraphAsSVG()
++ saveGraphAsDOT
+}
+
+class LineageToDrawIO {
+- tableStyle
+- columnStyle
+- edgeStyle
+- mxfile
+- __generateId__()
+- __addColumn__()
+- __getColId__()
+- __getObjName__()
+- __setStyle__()
+- __createAction__()
+- __duplicateColumns__()
+- __getEdgeListTargetColumn__()
+- __addTagToSourceColumn__()
+- __duplicateEdgesForColumn__()
+- __getTargetColumnsObject__()
+- __getTargetTableObject__()
++ addTable()
++ addEdge()
++ saveToFile()
++ addInteractionToDiagram()
+}
+
+QueryLineageAnalysis <-- LineageToDrawIO
+QueryLineageAnalysis <-- LineageDiagram
+
+@enduml
