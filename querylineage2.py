@@ -218,7 +218,7 @@ class QueryLineageAnalysis:
                             self.usedTablesFiltered.add(srcPair[0])
                 self.relationsSetNew[relation].extend(ls)
 
-    def isStmtOK(self,stmt):
+    def __isStmtOK__(self,stmt):
         pp=sqlparse.parse(stmt)
         ls = []
         ls.extend(pp[0])
@@ -256,7 +256,7 @@ class QueryLineageAnalysis:
             startTime = time.time()
             stmt = stmt.strip()
             self.__isDeclareAddVarName__(stmt)
-            if len(stmt) == 0 or not self.isStmtOK(stmt):
+            if len(stmt) == 0 or not self.__isStmtOK__(stmt):
                 if verbose:
                     stm = stmt.split(" ")
                     print("Statement {} starts with '{}' will be escaped".format(stmtIndex + 1,stm[0]))
@@ -338,7 +338,7 @@ class QueryLineageAnalysis:
 
     def __getSQLLineage__(self,sqlState, ddlList):
         sqlObbj = parse_one(sqlState, "bigquery")
-        self.getPivotColumnsToRealColumn(sqlObbj)
+        self.__getPivotColumnsToRealColumn__(sqlObbj)
         (targTable,DBName) = self.__getTargetTable__(sqlObbj)
         if DBName:
             self.DBTableLookup[targTable] = DBName
@@ -369,7 +369,7 @@ class QueryLineageAnalysis:
                 )
         return ls
 
-    def getPivotColumnsToRealColumn(self,sqlObj):
+    def __getPivotColumnsToRealColumn__(self,sqlObj):
         pv = list(sqlObj.find_all(exp.Pivot))
         if len(pv) == 0:
             return
