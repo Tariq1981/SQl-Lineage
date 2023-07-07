@@ -75,7 +75,19 @@ class LineageToDrawIO {
 + addInteractionToDiagram()
 }
 
+class DrawIOLineageGenerator {
+- templatePath
+- templateFile
+- tableStyleName
+- columnStyleName
+- __generateCSV__()
+- __generateId__()
++ addTable()
++ addColumn()
++ generateCSVDrawIO()
+}
 QueryLineageAnalysis <-- LineageToDrawIO
 QueryLineageAnalysis <-- LineageDiagram
+QueryLineageAnalysis <-- DrawIOLineageGenerator
 
 @enduml
