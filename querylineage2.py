@@ -11,7 +11,7 @@ from simple_ddl_parser import DDLParser
 from sqlglot import parse_one
 import sqlglot.expressions as exp
 from itertools import filterfalse
-from lineage_diagram import lineageDiagram
+from lineage_diagram import LineageDiagram
 from drawio_gen import DrawIOLineageGenerator
 from lineagetodrawio import LineageToDrawIO
 from sqllineage.runner import LineageRunner
@@ -68,9 +68,9 @@ class QueryLineageAnalysis:
                        bgColor="#FFFFFF",fontName="Arial",nodeSep=0.5,rankSep=5,headerColor="#96be5c",
                        edgStrokColor="#aeaeae",useFiltered=False):
         if templateFullPath and len(templateFullPath) > 0 and templateFileName and len(templateFileName) > 0:
-            self.diagram = lineageDiagram(entryTableName,"{}/{}".format(templateFullPath,templateFileName))
+            self.diagram = LineageDiagram(entryTableName, "{}/{}".format(templateFullPath, templateFileName))
         else:
-            self.diagram = lineageDiagram(entryTableName, None)
+            self.diagram = LineageDiagram(entryTableName, None)
         self.diagram.createGraph(bgColor,fontName,nodeSep,rankSep)
         usedT = self.usedTables
         if useFiltered and len(self.usedTablesFiltered) > 0:

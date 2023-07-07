@@ -2,7 +2,7 @@ import os
 import pydot
 from collections import defaultdict
 
-class lineageDiagram:
+class LineageDiagram:
     def __init__(self,graphName,templateFullPath):
         self.templateFullPath = templateFullPath
         self.graphName = graphName

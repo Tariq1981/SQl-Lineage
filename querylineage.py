@@ -7,7 +7,7 @@ import sqlglot.expressions as exp
 from simple_ddl_parser import DDLParser
 from sqllineage.runner import LineageRunner
 from sqllineage.utils.constant import LineageLevel
-from lineage_diagram import lineageDiagram
+from lineage_diagram import LineageDiagram
 import sqlparse
 from sqlparse.sql import Statement,TokenList,Token,Identifier
 from sqlparse import tokens as T
@@ -100,7 +100,7 @@ class QueryLineage:
                 self.relationsSet[relation] = relations[relation]
 
     def createGraph(self):
-        self.diagram = lineageDiagram(self.entryTableName,"{}/{}".format(self.templateFullPath,self.templateFileName))
+        self.diagram = LineageDiagram(self.entryTableName, "{}/{}".format(self.templateFullPath, self.templateFileName))
         self.diagram.createGraph()
         for table in self.tablesSet.keys():
             db = self.DBTableLookup[table]
