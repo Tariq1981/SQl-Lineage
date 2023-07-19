@@ -26,21 +26,28 @@ class LineageToDrawIO:
         return result.hexdigest()
 
     def addTable(self,name,columns,x=0,y=0,width=295,headerheight=25,collapsed=False):
+        userobj = self.__checkTableExist__(name)
         id = self.__generateId__(name)
-        userobj = objectify.SubElement(self.mxfile.diagram.mxGraphModel.root,"UserObject",
-                                       attrib={"id":id,"name":name,"label":name})
-        if collapsed:
-            mxcell = objectify.SubElement(userobj,"mxCell",attrib={"style":self.tableStyle,"vertex":"1","parent":"1"})
-        else:
-            mxcell = objectify.SubElement(userobj, "mxCell",attrib={"style": self.tableStyle, "vertex": "1",
-                                                                    "parent": "1","collapsed":"1"})
-        objectify.SubElement(mxcell,"mxGeometry",attrib={"x":str(x),"y":str(y),"width":str(width),
-                                                         "height":str(headerheight),"as":"geometry"})
+        if userobj is None:
+            userobj = objectify.SubElement(self.mxfile.diagram.mxGraphModel.root,"UserObject",
+                                           attrib={"id":id,"name":name,"label":name})
+            if collapsed:
+                mxcell = objectify.SubElement(userobj, "mxCell", attrib={"style": self.tableStyle, "vertex": "1",
+                                                                         "parent": "1", "collapsed": "1"})
+            else:
+                mxcell = objectify.SubElement(userobj, "mxCell",
+                                              attrib={"style": self.tableStyle, "vertex": "1", "parent": "1"})
+
+            objectify.SubElement(mxcell,"mxGeometry",attrib={"x":str(x),"y":str(y),"width":str(width),
+                                                             "height":str(headerheight),"as":"geometry"})
         self.__addColumn__(id,name,columns,headerheight,width)
+
 
     def __addColumn__(self,tableId,tablename,columnsList,itemHeight,itemWidth):
         y = itemHeight
         for column in columnsList:
+            if self.__getColId__(tablename,column):
+                continue
             id = self.__generateId__(tablename+"_"+column)
             userobj=objectify.SubElement(self.mxfile.diagram.mxGraphModel.root, "UserObject",
                                  attrib={"id": id, "name": column,"label":column})
@@ -50,18 +57,29 @@ class LineageToDrawIO:
                                                                "height": str(itemHeight), "as": "geometry"})
             y+=itemHeight
 
+    def getEdgesToTargetList(self,targetId):
+        predicate = "UserObject[@id = '{}']".format(id)
+        tblObj = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
 
-    def addTag(self,id,tag):
-        pass
+    def __checkTableExist__(self,tableName):
+        id = self.__generateId__(tableName)
+        predicate = "UserObject[@id = '{}']".format(id)
+        tblObj = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
+        if len(tblObj) > 0:
+            return tblObj[0]
+        return None
 
     def __getColId__(self,tableName,colName):
         predicate = "UserObject[@name = '{}']/mxCell[@vertex='1']/..".format(tableName)
         tblObj = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
-        tblId = tblObj[0].attrib["id"]
-        predicate = "UserObject[@name = '{}']/mxCell[@vertex='1'][@parent='{}']/..".format(colName, tblId)
-        colObj = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
-        colId = colObj[0].attrib["id"]
-        return colId
+        if len(tblObj) > 0:
+            tblId = tblObj[0].attrib["id"]
+            predicate = "UserObject[@name = '{}']/mxCell[@vertex='1'][@parent='{}']/..".format(colName, tblId)
+            colObj = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
+            if len(colObj) > 0:
+                colId = colObj[0].attrib["id"]
+                return colId
+        return None
 
     def addEdge(self,srcTblName,srcColName,tgtTblName,tgtColName):
         srcColId = self.__getColId__(srcTblName,srcColName)
@@ -117,30 +135,30 @@ class LineageToDrawIO:
         columnObj.mxCell.attrib["style"] = strStyle
         return columnObj
 
-    def __createAction__(self,destColName, normStyles, selStyles):
+    def __createAction__(self,destColName,linId ,normStyles, selStyles):
         """
         Get list of tags and create te selct and normal action
         """
 
-        show_norm = '{{"show":{{"tags":["norm_{}"]}}}}'.format(destColName)
-        show_sel = '{{"show":{{"tags":["sel_{}"]}}}}'.format(destColName)
-        hide_norm = '{{"hide":{{"tags":["norm_{}"]}}}}'.format(destColName)
-        hide_sel = '{{"hide":{{"tags":["sel_{}"]}}}}'.format(destColName)
+        show_norm = '{{"show":{{"tags":["norm_{}_{}"]}}}}'.format(linId,destColName)
+        show_sel = '{{"show":{{"tags":["sel_{}_{}"]}}}}'.format(linId,destColName)
+        hide_norm = '{{"hide":{{"tags":["norm_{}_{}"]}}}}'.format(linId,destColName)
+        hide_sel = '{{"hide":{{"tags":["sel_{}_{}"]}}}}'.format(linId,destColName)
 
-        show_norm_arrows = '{"show":{"tags":["norm_arrows"]}}'
-        show_sel_arrows = '{"show":{"tags":["sel_arrows"]}}'
-        hide_norm_arrows = '{"hide":{"tags":["norm_arrows"]}}'
-        hide_sel_arrows = '{"hide":{"tags":["sel_arrows"]}}'
+        show_norm_arrows = '{{"show":{{"tags":["norm_{}_arrows"]}}}}'.format(linId)
+
+        hide_norm_arrows = '{{"hide":{{"tags":["norm_{}_arrows"]}}}}'.format(linId)
+        hide_sel_arrows = '{{"hide":{{"tags":["sel_{}_arrows"]}}}}'.format(linId)
 
         style_norm = []
         for key in normStyles.keys():
-            temp = '{{"style":{{"tags":["src_{}"],"key":"{}","value":"{}"}}}}'.format(destColName, key, normStyles[key])
+            temp = '{{"style":{{"tags":["src_{}_{}"],"key":"{}","value":"{}"}}}}'.format(linId,destColName, key, normStyles[key])
             style_norm.append(temp)
 
         final_norm_style = ",".join(style_norm)
         style_sel = []
         for key in selStyles.keys():
-            temp = '{{"style":{{"tags":["src_{}"],"key":"{}","value":"{}"}}}}'.format(destColName, key, selStyles[key])
+            temp = '{{"style":{{"tags":["src_{}_{}"],"key":"{}","value":"{}"}}}}'.format(linId,destColName, key, selStyles[key])
             style_sel.append(temp)
         final_sel_style = ",".join(style_sel)
         action_show_norm = 'data:action/json,{{"actions":[{},{},{},{},{}]}}'.format(show_norm, show_norm_arrows,
@@ -150,21 +168,21 @@ class LineageToDrawIO:
                                                                                 final_sel_style)
         return (action_show_norm, action_show_sel)
 
-    def __duplicateColumns__(self, columnsList):
+    def __duplicateColumns__(self,linId, columnsList):
         for col in columnsList:
             elem = deepcopy(col)
-            elem.attrib["id"] = "cloned_" + elem.attrib["id"]
+            elem.attrib["id"] = "cloned_"+linId+"_" + elem.attrib["id"]
 
-            elem.attrib["tags"] = "sel_" + self.__getObjName__(elem)
-            col.attrib["tags"] = "norm_" + self.__getObjName__(elem)
+            elem.attrib["tags"] = "sel_"+linId+"_"+ self.__getObjName__(elem)
+            col.attrib["tags"] = "norm_" +linId+"_"+ self.__getObjName__(elem)
 
             elem.mxCell.attrib['visible'] = "0"
             col.mxCell.attrib['visible'] = "1"
 
             elem = self.__setStyle__(elem, {"gradientColor": "#ffa500"})
 
-            (normAction, selAction) = self.__createAction__(self.__getObjName__(elem), {"gradientColor": "#b3b3b3"},
-                                                   {"gradientColor": "#ffa500"})
+            (normAction, selAction) = self.__createAction__(self.__getObjName__(elem),linId, {"gradientColor": "#b3b3b3"},
+                                                            {"gradientColor": "#ffa500"})
             elem.attrib["link"] = normAction
             col.attrib["link"] = selAction
             # par = col.getparent()
@@ -178,7 +196,7 @@ class LineageToDrawIO:
         edges = self.mxfile.diagram.mxGraphModel.root.iterfind(predicate)
         return edges
 
-    def __addTagToSourceColumn__(self, srcColumnId, destColumnObject):
+    def __addTagToSourceColumn__(self, srcColumnId,linId ,destColumnObject):
         predicate = "UserObject[@id = '{}']/mxCell[@vertex='1']/..".format(srcColumnId)
         srcCol = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
         srcCol = srcCol[0]
@@ -187,25 +205,25 @@ class LineageToDrawIO:
         else:
             tags = ""
         tgls = tags.split(" ")
-        tgls.append("src_" + self.__getObjName__(destColumnObject))
+        tgls.append("src_" + linId+"_" + self.__getObjName__(destColumnObject))
         if len(tgls[0]) == 0:
             tgls.pop(0)
         srcCol.attrib["tags"] = " ".join(tgls)
 
-    def __duplicateEdgesForColumn__(self, columnObject, removeEdge=True,selectedStrokCol="#f51919"):
+    def __duplicateEdgesForColumn__(self, columnObject,linId, removeEdge=True,selectedStrokCol="#f51919"):
         edges = list(self.__getEdgeListTargetColumn__(columnObject))
         for edge in edges:
             srcId = edge.mxCell.attrib["source"]
-            self.__addTagToSourceColumn__(srcId, columnObject)
+            self.__addTagToSourceColumn__(srcId,linId ,columnObject)
             elem = deepcopy(edge)
-            elem.attrib["id"] = "cloned_" + elem.attrib["id"]
-            elem.attrib["tags"] = "sel_" + self.__getObjName__(columnObject) + " sel_arrows"
-            edge.attrib["tags"] = "norm_" + self.__getObjName__(columnObject) + " norm_arrows"
+            elem.attrib["id"] = "cloned_" +linId+"_"+ elem.attrib["id"]
+            elem.attrib["tags"] = "sel_"+linId+"_" + self.__getObjName__(columnObject) + " sel_{}_arrows".format(linId)
+            edge.attrib["tags"] = "norm_" + linId+"_" +self.__getObjName__(columnObject) + " norm_{}_arrows".format(linId)
             elem = self.__setStyle__(elem, {"strokeColor": selectedStrokCol}, removeEdge=removeEdge)
             edge = self.__setStyle__(edge, {"strokeColor": "#000000"}, removeEdge=removeEdge)
             elem.mxCell.attrib['visible'] = "0"
             edge.mxCell.attrib['visible'] = "1"
-            elem.mxCell.attrib["target"] = "cloned_" + edge.mxCell.attrib["target"]
+            elem.mxCell.attrib["target"] = "cloned_" + linId + "_" + edge.mxCell.attrib["target"]
             # mxfile.diagram.mxGraphModel.root.append(elem)
             self.mxfile.diagram.mxGraphModel.root.insert(self.mxfile.diagram.mxGraphModel.root.index(edge) + 1, elem)
         return self.mxfile
@@ -228,12 +246,12 @@ class LineageToDrawIO:
         return None
 
 
-    def addInteractionToDiagram(self,targetName,selStrokCol="#f51919"):
+    def addInteractionToDiagram(self,linId,targetName,selStrokCol="#f51919"):
         obj = self.__getTargetTableObject__(targetName)
         lsColumns = self.__getTargetColumnsObject__(obj)
-        self.mxfile = self.__duplicateColumns__(lsColumns)
+        self.mxfile = self.__duplicateColumns__(linId,lsColumns)
         for col in lsColumns:
-            self.mxfile = self.__duplicateEdgesForColumn__(col, removeEdge=False,selectedStrokCol=selStrokCol)
+            self.mxfile = self.__duplicateEdgesForColumn__(col,linId, removeEdge=False,selectedStrokCol=selStrokCol)
 
 
 if __name__ == "__main__":

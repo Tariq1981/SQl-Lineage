@@ -42,6 +42,9 @@ class QueryLineageAnalysis:
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
         self.varNames = set()
+        self.linTablesList = []
+        self.currentSrcTables = set()
+        self.totalTgtTables = set()
         self.pivotColumn = defaultdict()
         self.config = configparser.SafeConfigParser()
         self.__parseDDL__()
@@ -111,6 +114,9 @@ class QueryLineageAnalysis:
 
     def writeGraphvizToPNG(self,fullPath):
         self.diagram.saveGraphAsPNG(fullPath)
+        jsonStr = self.diagram.getJsonGraphviz()
+        with open("jsonFile.json","w") as f:
+            f.write(jsonStr.decode("utf-8"))
 
 
     def generateDrawIOXMLLayout(self,
@@ -247,11 +253,12 @@ class QueryLineageAnalysis:
     def getLineage(self, entrytableName,verbose=False):
         raw_sql = self.__readSql__(entrytableName)
         if not (raw_sql):
-            return None
+            return False
         statements = raw_sql.split(";")
         if verbose:
             print("Number of detected Statements: {}".format(len(statements)))
         stmtIndex = 0
+        self.currentSrcTables.clear()
         for stmt in statements:
             startTime = time.time()
             stmt = stmt.strip()
@@ -294,6 +301,7 @@ class QueryLineageAnalysis:
                 print("Statements {}/{} has been parsed".format(stmtIndex+1,len(statements)))
                 print("---------------------------------")
             stmtIndex+=1
+        return True
 
     def __updateTablesRelations__(self,tables,relations):
         for table in tables.keys():
@@ -306,12 +314,14 @@ class QueryLineageAnalysis:
                 self.relationsSet[relation] = relations[relation]
                 tgtTable =relation[0]
                 tgtColumn = relation[1]
+                self.totalTgtTables.add(tgtTable)
                 if tgtColumn not in self.tablesSetSearch[tgtTable]:
                     self.tablesSet[tgtTable].append(tgtColumn)
                     self.tablesSetSearch[tgtTable].add(tgtColumn)
                 for srcPair in relations[relation]:
                     srcTable = srcPair[0]
                     srcColumn = srcPair[1]
+                    self.currentSrcTables.add(srcTable)
                     if srcColumn not in self.tablesSetSearch[srcTable]:
                         self.tablesSetSearch[srcTable].add(srcColumn)
                         self.tablesSet[srcTable].append(srcColumn)
@@ -363,8 +373,8 @@ class QueryLineageAnalysis:
                     {
                         'TargetTable': targTable,
                         'TargetColumn': targCols[ind],
-                        'SourceTable': 'Hardcoded/Unknown',
-                        'SourceColumn': 'Constant/Unknown'
+                        'SourceTable': 'Hardcoded_Unknown',
+                        'SourceColumn': 'Constant_Unknown'
                     }
                 )
         return ls
@@ -496,13 +506,15 @@ class QueryLineageAnalysis:
                             break
         return list(set(ls))
 
-    def __getColList__(self,col):
-        cols = list(col.find_all(exp.Column))
-        return list(map(lambda X: X.alias_or_name, cols))
 
     def __getColTableAliasList__(self,col):
-        cols = list(col.find_all(exp.Column))
-        return list(map(lambda X: (X.table.upper(), X.alias_or_name.upper()), cols))
+        cols = list(col.find_all(exp.Column,exp.Var))
+        def colToTuple(col):
+            if isinstance(col,exp.Column):
+                return (col.table.upper(), col.alias_or_name.upper())
+            else:
+                return ("", col.alias_or_name.upper())
+        return list(map(colToTuple, cols))
 
     def __getColumnByNameFromSelect__(self,sel, colName):
         for col in sel.selects:
@@ -512,7 +524,7 @@ class QueryLineageAnalysis:
                     if a.alias_or_name.upper() == colName:
                         return a
             else:
-                cols = list(col.find_all(exp.Column))
+                cols = list(col.find_all(exp.Column,exp.Var))
                 for c in cols:
                     if c.alias_or_name.upper() == colName:
                         return col
@@ -534,58 +546,7 @@ class QueryLineageAnalysis:
             return None
         return sel.selects[colInd]
 
-    def __getSourceTable__(self,ind, sqlObj, ddlList):
-        sels = list(sqlObj.find_all(exp.Select))
-        col = sels[0].selects[ind]
-        if isinstance(col, exp.Alias):
-            return self.__getSrouceTableSelects__('', col.this.alias_or_name.upper(), sels[0], ddlList)
-        else:
-            return self.__getSrouceTableSelects__('', col.alias_or_name.upper(), sels[0], ddlList)
 
-    # fix for TAB1
-    def __getSrouceTableSelects__(self,tableAlias, col, sqlObj, ddlList):
-        tableNames = []
-        sels = list(sqlObj.find_all(exp.Select))
-        selTgt = sels[0]
-        fromJoin = list(selTgt.find_all(exp.From, exp.Join))
-        for f in fromJoin:
-            if f.parent_select == selTgt:
-                if isinstance(f, exp.From) and isinstance(f.expressions[0], exp.Table):
-                    if tableAlias and len(tableAlias) > 0 and len(f.expressions[0].alias_or_name) > 0:
-                        if tableAlias.upper() == f.expressions[0].alias_or_name.upper():
-                            tableNames.append(f.expressions[0].this.alias_or_name.upper())
-                    else:
-                        if col.upper() in ddlList[f.expressions[0].this.alias_or_name.upper()]:
-                            tableNames.append(f.expressions[0].this.alias_or_name.upper())
-                elif isinstance(f, exp.Join) and f.this and isinstance(f.this, exp.Table):
-                    if tableAlias and len(tableAlias) > 0 and len(f.this.alias_or_name) > 0:
-                        if tableAlias.upper() == f.this.alias_or_name.upper():
-                            tableNames.append(f.this.this.alias_or_name.upper())
-                    else:
-                        if col.upper() in ddlList[f.this.this.alias_or_name.upper()]:
-                            tableNames.append(f.this.this.alias_or_name.upper())
-                else:
-                    sss = list(f.find_all(exp.Select))
-                    cc = None
-                    for column in sss[0].selects:
-                        if column.alias_or_name.upper() == col:
-                            cc = column
-                            break
-                    if cc:
-                        newCols = self.__getColTableAliasList__(cc)
-                        for newCol in newCols:
-                            tableName = self.__getSrouceTableSelects__(newCol[0], newCol[1], sss[0], ddlList)
-                            tableNames.extend(tableName)
-
-        return tableNames
-
-    def __getSourceTableColmnList__(self,trgtCols, sqlObj, ddlList):
-        dict = {}
-        for i in range(0, len(trgtCols)):
-            srcTable = self.__getSourceTable__(i, sqlObj, ddlList)
-            srcCol = self.__getSourceColumn__(i, trgtCols[i], sqlObj)
-            dict[trgtCols[i]] = (srcTable, srcCol)
-        return dict
 
     def __getTargetTable__(self,sqllotObj):
         tableName = None
@@ -872,16 +833,285 @@ class QueryLineageAnalysis:
                 ll.append(stmt1)
         return "".join(ll)
 
+    def getLineageDeep(self,targetTable,verbose=False):
+        from copy import deepcopy
+        ls = [targetTable]
+        linListIntial = []
+        linListFiltered = []
+        visited = set()
+        while len(ls) > 0:
+            current = ls.pop()
+            if current in visited:
+                continue
+            if verbose:
+                print("*** Getting Lineage for {} ***".format(current))
+            linFlag = self.getLineage(current,verbose=verbose)
+            if linFlag:
+                self.createfilteredRelations(current, ["VFPT_DH_LAKE_EDW_STAGING_S"])
+                self.linTablesList.append(current)
+                linListIntial.append(deepcopy(self.relationsSet))
+                linListFiltered.append(deepcopy(self.relationsSetNew))
+                ls.extend(list(self.currentSrcTables))
+                self.relationsSetNew.clear()
+                self.relationsSet.clear()
+
+            visited.add(current)
+        #if len(self.linTablesList) > 0:
+        #    for table in self.linTablesList:
+        #        self.createfilteredRelations(table,["VFPT_DH_LAKE_EDW_STAGING_S"])
+        #if len(self.linTablesList) > 0:
+        #    return True
+        """
+        pos = self.createGraphvizDeep(targetTable,self.linTablesList,linListFiltered,"./",None,rankSep=3,nodeSep=1.5)
+        self.writeGraphvizToPNG("Tab4.png")
+        self.generateDrawIOXMLLayoutDeepNetworkX(self.linTablesList,linListFiltered,pos,
+                                                 "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
+                                                 "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
+                                                 "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
+                                                 "./", "F_SUBSCRIBER_BASE_SEMANTIC_M.drawio",collapsed=True
+                                                 )
+        """
+        return (self.linTablesList,linListFiltered)
+
+    def assignXY(self,tempRelationsList):
+        dictColumns = defaultdict(set)
+        rela = []
+        for tempRelations in tempRelationsList:
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                dictColumns[tgtTable].add(tgtColumn)
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    dictColumns[tgtTable].add(srcTable)
+                    rela.append((tgtTable,srcTable))
+                    dictColumns[srcTable].add('')
+
+
+        import networkx as nx
+        #import matplotlib as mpl
+        #import matplotlib.pyplot as plt
+        G = nx.Graph()
+        G.add_nodes_from(dictColumns.keys())
+        G.add_edges_from(rela)
+        pos = nx.nx_pydot.graphviz_layout(G,prog="dot",root = G.nodes["F_SUBSCRIBER_BASE_SEMANTIC_M"])
+        #nx.draw_networkx(G, pos, node_size=10000)
+        #ax = plt.gca()
+        #ax.set_axis_off()
+        #plt.show()
+        return pos
+
+    def createGraphvizDeep(self,entryTableName,linTablesList,linRelations,templateFullPath,templateFileName,
+                           bgColor="#FFFFFF",fontName="Arial",nodeSep=0.5,rankSep=5,headerColor="#96be5c",
+                           edgStrokColor="#aeaeae",useFiltered=False):
+
+        if templateFullPath and len(templateFullPath) > 0 and templateFileName and len(templateFileName) > 0:
+            self.diagram = LineageDiagram(entryTableName, "{}/{}".format(templateFullPath, templateFileName))
+        else:
+            self.diagram = LineageDiagram(entryTableName, None)
+        self.diagram.createGraph(bgColor,fontName,nodeSep,rankSep)
+        usedT = self.usedTables
+
+        dictColumns = defaultdict(set)
+        for ind in range(0, len(linTablesList)):
+            tempRelations = linRelations[ind]
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                dictColumns[tgtTable].add(tgtColumn)
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    dictColumns[srcTable].add(srcColumn)
+
+        for tableName in dictColumns.keys():
+            db = self.DBTableLookup[tableName]
+            tableHeaderColor = headerColor
+            if not tableHeaderColor:
+                tableHeaderColor = self.DEFAULT_TABLE_HEADER
+            self.diagram.createNode(tableHeaderColor, tableName, sorted(list(dictColumns[tableName])))
+
+        for ind in range(0, len(linTablesList)):
+            tempRelations = linRelations[ind]
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    if edgStrokColor and len(edgStrokColor) > 0:
+                        edgColor = edgStrokColor
+                    else:
+                        edgColor = self.DEFAULT_EDGE
+                    self.diagram.createEdge(edgColor,srcTable,srcColumn,tgtTable,tgtColumn)
+        return self.diagram.getNodesPos()
+
+    def generateDrawIOXMLLayoutDeepNetworkX(self, linTablesList,
+                                            linRelations,
+                                            nodesPos,
+                                            tableStyle,
+                                            columnStyle,
+                                            edgeStyle,
+                                            outputPath,
+                                            outputFileName,
+                                            srcfactorSpace=2,
+                                            srcTgtSpaceFactor=4,
+                                            distinceSrcTgt=200,
+                                            itemHieght=25,
+                                            collapsed=False,
+                                            isInteractive=True,
+                                            strokeColor="#f51919",
+                                            useFiltered=False):
+
+        lin = LineageToDrawIO(tableStyle, columnStyle, edgeStyle)
+
+
+        for ind in range(0, len(linTablesList)):
+            tempRelations = linRelations[ind]
+            targetTableName = linTablesList[ind]
+            totalColumns = 0
+            dictColumns = defaultdict(set)
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                dictColumns[tgtTable].add(tgtColumn)
+                totalColumns += 1
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    dictColumns[srcTable].add(srcColumn)
+                    totalColumns += 1
+            totalColumns += len(dictColumns.keys())  ## number of tables as headers
+            for tableName in dictColumns.keys():
+                X = nodesPos[tableName][0]
+                Y = nodesPos[tableName][1]
+                lin.addTable(tableName, list(sorted(dictColumns[tableName])),
+                             X, Y, collapsed=collapsed)
+
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    lin.addEdge(srcTable, srcColumn, tgtTable, tgtColumn)
+
+        if isInteractive:
+            lin.addInteractionToDiagram(targetTableName, strokeColor)
+
+        lin.saveToFile(outputPath, outputFileName)
+
+    def generateDrawIOXMLLayoutDeep(self,linTablesList,
+                                    linRelations,
+                                    tableStyle,
+                                    columnStyle,
+                                    edgeStyle,
+                                    outputPath,
+                                    outputFileName,
+                                    srcfactorSpace=2,
+                                    srcTgtSpaceFactor=4,
+                                    distinceSrcTgt=200,
+                                    itemHieght=25,
+                                    collapsed=False,
+                                    isInteractive = True,
+                                    strokeColor = "#f51919",
+                                    useFiltered=False):
+        lin = LineageToDrawIO(tableStyle, columnStyle, edgeStyle)
+        """
+        Create dot using draing Graphviz and get position and use it to draw drawio
+        """
+        colsList = defaultdict(list)
+        previousSrcTableEndY = 0
+        previousSrcTableEndX = 0
+        reversedLinTablesList = linTablesList[::-1]
+        reversedLinRelations = linRelations[::-1]
+        dictColumns = defaultdict(set)
+        for ind in range(0,len(reversedLinTablesList)):
+            tempRelations = reversedLinRelations[ind]
+            targetTableName = reversedLinTablesList[ind]
+            totalColumns = 0
+            #dictColumns = defaultdict(set)
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                dictColumns[tgtTable].add(tgtColumn)
+                totalColumns+=1
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    dictColumns[srcTable].add(srcColumn)
+                    totalColumns += 1
+            totalColumns+=len(dictColumns.keys())  ## number of tables as headers
+
+            for tableName in dictColumns.keys():
+                if tableName == targetTableName:
+                    srcColumns = totalColumns - len(dictColumns[tableName])-1
+                    intial_y = int(srcColumns/4) *itemHieght
+                    y = intial_y - int(((len(dictColumns[tableName])+1)*itemHieght) /4)
+                    lin.addTable(tableName, list(sorted(dictColumns[tableName])),
+                                 previousSrcTableEndX + distinceSrcTgt*srcTgtSpaceFactor, y,collapsed=collapsed)
+
+
+                else:
+                    lin.addTable(tableName, list(sorted(dictColumns[tableName])),
+                                 previousSrcTableEndX,previousSrcTableEndY,collapsed=collapsed)
+                    previousSrcTableEndY+= ((srcfactorSpace+len(dictColumns[tableName])) * itemHieght)
+
+
+            previousSrcTableEndX += distinceSrcTgt*srcTgtSpaceFactor
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    lin.addEdge(srcTable, srcColumn, tgtTable, tgtColumn)
+
+
+            if isInteractive:
+                lin.addInteractionToDiagram(str(ind),targetTableName,strokeColor)
+
+        for tableName in dictColumns.keys():
+            table = lin.__checkTableExist__(tableName)
+            currentX = table.mxCell.mxGeometry.attrib["x"]
+            colsList[currentX].append(table)
+
+
+        print(colsList.keys())
+        for xInd in colsList.keys():
+            prevEndY = 0
+            lsCols = colsList[xInd]
+            lsCols.sort(key = lambda x: int(table.mxCell.mxGeometry.attrib["y"]))
+            for table in lsCols:
+                tableName = table.attrib["name"]
+                currentY = table.mxCell.mxGeometry.attrib["y"]
+                newY  = prevEndY + (srcfactorSpace * itemHieght)
+                if int(currentY) < prevEndY:
+                    table.mxCell.mxGeometry.attrib["y"] = str(newY)
+                prevEndY = prevEndY + ((srcfactorSpace + len(dictColumns[tableName])) * itemHieght)
+
+        lin.saveToFile(outputPath, outputFileName)
+
+
 
 if __name__ == "__main__":
-    ln = QueryLineageAnalysis("./", "./DDL",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S")
-    ln.getLineage("F_SUBSCRIBER_BASE_SEMANTIC_D")
-    ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
-    ln.createGraphviz("Test","./",None,True)
-    ln.writeGraphvizToPNG("Tab4.png")
-    ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
-    ln.generateDrawIOXMLLayout("F_SUBSCRIBER_BASE_SEMANTIC_D",
-                               "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
-                               "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
-                               "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                               "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",useFiltered=True)
+    ln = QueryLineageAnalysis("./", "./DDL",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S",isDebug=True)
+    (linTables,linRelations)=ln.getLineageDeep("F_SUBSCRIBER_BASE_SEMANTIC_D",True)
+    ln.generateDrawIOXMLLayoutDeep(linTables,linRelations,
+                                   "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
+                                   "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
+                                   "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
+                                   "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",collapsed=True
+                                   )
+    #ln.createGraphviz("F_SUBSCRIBER_BASE_SEMANTIC_M","./",None,rankSep=30,useFiltered=True)
+    #ln.writeGraphvizToPNG("Tab4.png")
+
+    #ln.createfilteredRelations("F_SUBSCRIBER_BASE_SEMANTIC_D",["VFPT_DH_LAKE_EDW_STAGING_S"])
+    #ln.createGraphviz("Test","./",None,True)
+    #ln.writeGraphvizToPNG("Tab4.png")
+    #ln.generateDrawIOCSV("./","Tab4.txt","tableBox","tableColumn","./","tab4_drawio.txt",True)
+    #ln.generateDrawIOXMLLayout("F_SUBSCRIBER_BASE_SEMANTIC_D",
+    #                           "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
+    #                           "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
+    #                           "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
+    #                           "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",useFiltered=True)

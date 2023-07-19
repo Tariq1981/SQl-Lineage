@@ -17,9 +17,16 @@ class LineageDiagram:
                                    fontname=fontName,
                                    layout='dot',
                                    rankdir='LR',
-                                   nodesep=nodeSep,
-                                   ranksep=rankSep
-                            )
+                                   nodesep=str(nodeSep),
+                                   ranksep=str(rankSep),
+                                   pad="0.1",
+                                   concentrate="true",
+                                   defaultdist="0.1",
+                                   maxiter="1000",
+                                   newrank="true",
+                                   overlap="prism",
+                                   pack="true"
+                                   )
 
     def createNode(self,headerColor,table,columnsList):
         label = self.__createNodeLabel__(headerColor,table,columnsList)
@@ -43,6 +50,28 @@ class LineageDiagram:
     def saveGraphAsDOT(self,fullFileNamePath):
         prts = fullFileNamePath.split(".")
         self.graph.write_raw(prts[0]+".dot")
+    def getJsonGraphviz(self):
+        return self.graph.create(format="plain")
+
+    def getNodesPos(self):
+        dotG = self.graph.create_dot(prog="dot")
+        df = str(dotG, encoding='UTF-8')
+        Q_list = pydot.graph_from_dot_data(df)
+        Q = Q_list[0]
+        node_pos = {}
+        for n in self.graph.get_node_list():
+            str_n = str(n.obj_dict["name"])
+            pydot_node = pydot.Node(str_n).get_name()
+            node = Q.get_node(pydot_node)
+
+            if isinstance(node, list):
+                node = node[0]
+            pos = node.get_pos()[1:-1]  # strip leading and trailing double quotes
+            if pos is not None:
+                xx, yy = pos.split(",")
+                node_pos[str_n] = (float(xx), float(yy))
+        return node_pos
+
 
     def __createNodeLabel__(self,headerColor,table,columnsList):
         label = '<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">' \
