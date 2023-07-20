@@ -584,14 +584,15 @@ class QueryLineageAnalysis:
                     cols.append(col.alias_or_name.upper())
             else:
                 sels = list(sqlObj.find_all(exp.Select))
-                selTarget: exp.Subquery = None
-                for sel in sels:
-                    selTarget = sel
-                    if selTarget.parent == sqlObj:
-                        break
-                selQuery: exp.Select = selTarget
-                for col in selQuery.selects:
-                    cols.append(col.alias_or_name.upper())
+                if len(sels) > 0 :
+                    selTarget: exp.Subquery = None
+                    for sel in sels:
+                        selTarget = sel
+                        if selTarget.parent == sqlObj:
+                            break
+                    selQuery: exp.Select = selTarget
+                    for col in selQuery.selects:
+                        cols.append(col.alias_or_name.upper())
         return cols
 
     def __replaceStarInQuery__(self,col: exp.Column, ddlList):
@@ -1096,12 +1097,12 @@ class QueryLineageAnalysis:
 
 if __name__ == "__main__":
     ln = QueryLineageAnalysis("./", "./DDL",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S",isDebug=True)
-    (linTables,linRelations)=ln.getLineageDeep("F_SUBSCRIBER_BASE_SEMANTIC_D",True)
+    (linTables,linRelations)=ln.getLineageDeep("F_SUBSCRIBER_BASE_EVENT_D",True)
     ln.generateDrawIOXMLLayoutDeep(linTables,linRelations,
                                    "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                                    "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                                    "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                                   "./","F_SUBSCRIBER_BASE_SEMANTIC_D.drawio",collapsed=True
+                                   "./","F_SUBSCRIBER_BASE_EVENT_D.drawio",collapsed=True
                                    )
     #ln.createGraphviz("F_SUBSCRIBER_BASE_SEMANTIC_M","./",None,rankSep=30,useFiltered=True)
     #ln.writeGraphvizToPNG("Tab4.png")
