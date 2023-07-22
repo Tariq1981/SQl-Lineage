@@ -95,6 +95,12 @@ class LineageToDrawIO:
                              attrib={"relative":"1", "as": "geometry"})
         objectify.SubElement(geom,"mxPoint",attrib={"as":"offset"})
 
+    def moveEdgesToBack(self):
+        predicate = "UserObject/mxCell[@edge='1']/.."
+        edges = list(self.mxfile.diagram.mxGraphModel.root.iterfind(predicate))
+        for edge in edges:
+            self.mxfile.diagram.mxGraphModel.root.insert(0,edge)
+
     def __str__(self):
         objectify.deannotate(self.mxfile, cleanup_namespaces=True)
         gg = etree.tostring(self.mxfile,pretty_print=True)
