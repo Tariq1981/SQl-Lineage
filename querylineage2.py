@@ -1,21 +1,19 @@
 import os
 from collections import defaultdict
 import time
-import configparser
 import re
 import sqlparse
+from copy import deepcopy
 from sqlparse import tokens as T
 from sqlparse.sql import TokenList,Token,Identifier,Function
-from sqlparse.tokens import Keyword
 from simple_ddl_parser import DDLParser
 from sqlglot import parse_one
 import sqlglot.expressions as exp
 from itertools import filterfalse
+
 from lineage_diagram import LineageDiagram
 from drawio_gen import DrawIOLineageGenerator
 from lineagetodrawio import LineageToDrawIO
-from sqllineage.runner import LineageRunner
-from sqllineage.utils.constant import LineageLevel
 
 
 """ 
@@ -42,11 +40,10 @@ class QueryLineageAnalysis:
         self.DBTableLookup = defaultdict(lambda: 'DEFAULT')
         self.keywordsList=set(["CREATE","INSERT"])
         self.varNames = set()
-        self.linTablesList = []
+        #self.linTablesList = []
         self.currentSrcTables = set()
         self.totalTgtTables = set()
         self.pivotColumn = defaultdict()
-        self.config = configparser.SafeConfigParser()
         self.__parseDDL__()
 
     def __parseDDL__(self):
@@ -133,6 +130,7 @@ class QueryLineageAnalysis:
                                 collapsed=False,
                                 isInteractive = True,
                                 strokeColor = "#f51919",
+                                strokeWidth = 3,
                                 useFiltered=False):
         """Set x and y based on if it is source or target sources on the let and target on the right
         updateteh xml creation to accept x,y,width and height
@@ -178,7 +176,8 @@ class QueryLineageAnalysis:
                 lin.addEdge(srcTable, srcColumn, tgtTable, tgtColumn)
 
         if isInteractive:
-            lin.addInteractionToDiagram(targetTableName,strokeColor)
+            lin.addInteractionToDiagram("0",targetTableName,strokeColor,strokeWidth)
+        lin.moveEdgesToBack()
         lin.saveToFile(outputPath, outputFileName)
 
     def generateDrawIOCSV(self,templatePath,templateFileName,
@@ -835,7 +834,7 @@ class QueryLineageAnalysis:
         return "".join(ll)
 
     def getLineageDeep(self,targetTable,verbose=False):
-        from copy import deepcopy
+        linTablesList = []
         ls = [targetTable]
         linListIntial = []
         linListFiltered = []
@@ -849,7 +848,7 @@ class QueryLineageAnalysis:
             linFlag = self.getLineage(current,verbose=verbose)
             if linFlag:
                 self.createfilteredRelations(current, ["VFPT_DH_LAKE_EDW_STAGING_S"])
-                self.linTablesList.append(current)
+                linTablesList.append(current)
                 linListIntial.append(deepcopy(self.relationsSet))
                 linListFiltered.append(deepcopy(self.relationsSetNew))
                 ls.extend(list(self.currentSrcTables))
@@ -857,22 +856,8 @@ class QueryLineageAnalysis:
                 self.relationsSet.clear()
 
             visited.add(current)
-        #if len(self.linTablesList) > 0:
-        #    for table in self.linTablesList:
-        #        self.createfilteredRelations(table,["VFPT_DH_LAKE_EDW_STAGING_S"])
-        #if len(self.linTablesList) > 0:
-        #    return True
-        """
-        pos = self.createGraphvizDeep(targetTable,self.linTablesList,linListFiltered,"./",None,rankSep=3,nodeSep=1.5)
-        self.writeGraphvizToPNG("Tab4.png")
-        self.generateDrawIOXMLLayoutDeepNetworkX(self.linTablesList,linListFiltered,pos,
-                                                 "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
-                                                 "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
-                                                 "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                                                 "./", "F_SUBSCRIBER_BASE_SEMANTIC_M.drawio",collapsed=True
-                                                 )
-        """
-        return (self.linTablesList,linListFiltered)
+
+        return (linTablesList,linListFiltered)
 
     def assignXY(self,tempRelationsList):
         dictColumns = defaultdict(set)
@@ -1016,6 +1001,7 @@ class QueryLineageAnalysis:
                                     collapsed=False,
                                     isInteractive = True,
                                     strokeColor = "#f51919",
+                                    strokeWidth = 3,
                                     useFiltered=False):
         lin = LineageToDrawIO(tableStyle, columnStyle, edgeStyle)
         """
@@ -1070,7 +1056,7 @@ class QueryLineageAnalysis:
 
 
             if isInteractive:
-                lin.addInteractionToDiagram(str(ind),targetTableName,strokeColor)
+                lin.addInteractionToDiagram(str(ind),targetTableName,strokeColor,strokeWidth)
 
         for tableName in dictColumns.keys():
             table = lin.__checkTableExist__(tableName)
@@ -1078,31 +1064,78 @@ class QueryLineageAnalysis:
             colsList[currentX].append(table)
 
 
-        print(colsList.keys())
+        #print(colsList.keys())
         for xInd in colsList.keys():
-            prevEndY = 0
+            nextEndY = 0
             lsCols = colsList[xInd]
             lsCols.sort(key = lambda x: int(table.mxCell.mxGeometry.attrib["y"]))
             for table in lsCols:
                 tableName = table.attrib["name"]
                 currentY = table.mxCell.mxGeometry.attrib["y"]
-                newY  = prevEndY + (srcfactorSpace * itemHieght)
-                if int(currentY) < prevEndY:
+                if int(currentY) < nextEndY:
+                    newY = nextEndY + (srcfactorSpace * itemHieght)
                     table.mxCell.mxGeometry.attrib["y"] = str(newY)
-                prevEndY = prevEndY + ((srcfactorSpace + len(dictColumns[tableName])) * itemHieght)
+                    nextEndY = newY + ((srcfactorSpace + len(dictColumns[tableName])) * itemHieght)
+                else:
+                    nextEndY = int(currentY) + (1+len(dictColumns[tableName])) * itemHieght
 
+
+        lin.moveEdgesToBack()
+        tableLevels = self.layoutDrawIO(targetTableName,dictColumns,linRelations)
+        levels = sorted(list(tableLevels.keys()),reverse=True)
+        maxLevel = max(levels)
+
+        for level in levels:
+            tables = sorted(tableLevels[level])
+            yInd = 30
+            xInd = distinceSrcTgt * srcTgtSpaceFactor * (maxLevel - level + 1)
+            for table in tables:
+                lin.moveNode(table,xInd,yInd)
+                yInd+=((srcfactorSpace + len(dictColumns[table])) * itemHieght)
         lin.saveToFile(outputPath, outputFileName)
+
+
+    def layoutDrawIO(self,targetTable,dictColumns,linRelations):
+        tableLevel = {}
+        linTree=defaultdict(set)
+        for ind in range(0, len(linRelations)):
+            tempRelations = linRelations[ind]
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    linTree[tgtTable].add(srcTable)
+
+        level = 1
+        ls = [targetTable]
+        cnt = 1
+        while len(ls) > 0:
+            for i in range(0,cnt):
+                current = ls.pop(0)
+                tableLevel[current] = level
+                if len(linTree[current]) > 0:
+                    ls.extend(linTree[current])
+            level+=1
+            cnt = len(ls)
+        print(tableLevel)
+        tableLevelByLevel = defaultdict(list)
+        for table in tableLevel.keys():
+            tableLevelByLevel[tableLevel[table]].append(table)
+        return tableLevelByLevel
+
+
+
 
 
 
 if __name__ == "__main__":
     ln = QueryLineageAnalysis("./", "./DDL",defaultDB = "VFPT_DH_LAKE_EDW_STAGING_S",isDebug=True)
-    (linTables,linRelations)=ln.getLineageDeep("F_SUBSCRIBER_BASE_EVENT_D",True)
+    (linTables,linRelations)=ln.getLineageDeep("F_SUBSCRIBER_BASE_SEMANTIC_M",True)
     ln.generateDrawIOXMLLayoutDeep(linTables,linRelations,
                                    "shape=swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;align=center;fontSize=14;fillColor=#60a917;strokeColor=#2D7600;fontColor=#ffffff;",
                                    "text;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=12;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;gradientColor=#b3b3b3;",
                                    "rounded=0;orthogonalLoop=1;jettySize=auto;html=1;orthogonal=1;edgeStyle=orthogonalEdgeStyle;curved=1;",
-                                   "./","F_SUBSCRIBER_BASE_EVENT_D.drawio",collapsed=True
+                                   "./","F_SUBSCRIBER_BASE_SEMANTIC_M.drawio",collapsed=True
                                    )
     #ln.createGraphviz("F_SUBSCRIBER_BASE_SEMANTIC_M","./",None,rankSep=30,useFiltered=True)
     #ln.writeGraphvizToPNG("Tab4.png")

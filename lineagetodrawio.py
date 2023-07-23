@@ -216,7 +216,7 @@ class LineageToDrawIO:
             tgls.pop(0)
         srcCol.attrib["tags"] = " ".join(tgls)
 
-    def __duplicateEdgesForColumn__(self, columnObject,linId, removeEdge=True,selectedStrokCol="#f51919"):
+    def __duplicateEdgesForColumn__(self, columnObject,linId, removeEdge=True,selectedStrokCol="#f51919",selectedStrokWidth=3):
         edges = list(self.__getEdgeListTargetColumn__(columnObject))
         for edge in edges:
             srcId = edge.mxCell.attrib["source"]
@@ -225,7 +225,8 @@ class LineageToDrawIO:
             elem.attrib["id"] = "cloned_" +linId+"_"+ elem.attrib["id"]
             elem.attrib["tags"] = "sel_"+linId+"_" + self.__getObjName__(columnObject) + " sel_{}_arrows".format(linId)
             edge.attrib["tags"] = "norm_" + linId+"_" +self.__getObjName__(columnObject) + " norm_{}_arrows".format(linId)
-            elem = self.__setStyle__(elem, {"strokeColor": selectedStrokCol}, removeEdge=removeEdge)
+            elem = self.__setStyle__(elem, {"strokeColor": selectedStrokCol,"strokeWidth":str(selectedStrokWidth)},
+                                     removeEdge=removeEdge)
             edge = self.__setStyle__(edge, {"strokeColor": "#000000"}, removeEdge=removeEdge)
             elem.mxCell.attrib['visible'] = "0"
             edge.mxCell.attrib['visible'] = "1"
@@ -252,12 +253,19 @@ class LineageToDrawIO:
         return None
 
 
-    def addInteractionToDiagram(self,linId,targetName,selStrokCol="#f51919"):
+    def addInteractionToDiagram(self,linId,targetName,selStrokCol="#f51919",strokWidth=3):
         obj = self.__getTargetTableObject__(targetName)
         lsColumns = self.__getTargetColumnsObject__(obj)
         self.mxfile = self.__duplicateColumns__(linId,lsColumns)
         for col in lsColumns:
-            self.mxfile = self.__duplicateEdgesForColumn__(col,linId, removeEdge=False,selectedStrokCol=selStrokCol)
+            self.mxfile = self.__duplicateEdgesForColumn__(col,linId, removeEdge=False,selectedStrokCol=selStrokCol,
+                                                           selectedStrokWidth=strokWidth)
+    def moveNode(self,tableName,xCoord,yCoord):
+        userObj = self.__checkTableExist__(tableName)
+        if userObj is not None:
+            userObj.mxCell.mxGeometry.attrib["x"] = str(xCoord)
+            userObj.mxCell.mxGeometry.attrib["y"] = str(yCoord)
+
 
 
 if __name__ == "__main__":
