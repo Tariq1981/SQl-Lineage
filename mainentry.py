@@ -12,6 +12,10 @@ if __name__ == "__main__":
     args = argParser.parse_args()
     parser = ConfigParser()
     parser.read(args.path)
+    isDeep = False
+    deep = parser.get("lineage","deep")
+    if deep and deep.lower() == "true":
+        isDeep = True
     isDebug = False
     deb = parser.get("lineage","debug")
     deb_path = parser.get("lineage","debug_log")
@@ -32,7 +36,10 @@ if __name__ == "__main__":
     outPath = parser.get("graph","output_path")
     defaultDB = parser.get("lineage","defaultDB")
     ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB,isDebug,deb_path)
-    ln.getLineage(targetTableName.upper(),verbose)
+    if isDeep:
+        (linTables,linRelations) = ln.getLineageDeep(targetTableName.upper(),verbose)
+    else:
+        ln.getLineage(targetTableName.upper(),verbose)
     filter = False
     if filterTables == "true":
         filter = True
@@ -48,7 +55,12 @@ if __name__ == "__main__":
         fontName = parser.get("graphviz","font_name")
         srcSep = float(parser.get("graphviz","vertical_sep"))
         tgtSep = float(parser.get("graphviz", "horizontal_sep"))
-        ln.createGraphviz(targetTableName.upper(), templatePath, templateFileName,bgColor,fontName,srcSep,tgtSep ,useFiltered=filter)
+        if isDeep:
+            ln.createGraphvizDeep(targetTableName.upper(),linTables,linRelations,templatePath,templateFileName,
+                                  bgColor,fontName,srcSep,tgtSep,useFiltered=filter)
+        else:
+            ln.createGraphviz(targetTableName.upper(), templatePath, templateFileName,
+                              bgColor,fontName,srcSep,tgtSep ,useFiltered=filter)
         ln.writeGraphvizToPNG("{}/{}.png".format(outPath, targetTableName.upper()))
     elif graphType.lower() == "drawio":
             tableStyle = parser.get("drawio", "table_style")
@@ -58,6 +70,7 @@ if __name__ == "__main__":
             edgeStyle = parser.get("drawio", "edge_style")
             edgeStyle = edgeStyle[1:-1]
             stroColor = parser.get("drawio","stroke_color")
+            stroWidth = parser.get("drawio", "stroke_width")
             sourceSpaceFactor = int(parser.get("drawio","source_space_factor"))
             sourceTargetSpaceFactor = int(parser.get("drawio", "source_target_space"))
             sourceTargetDist = int(parser.get("drawio", "srouce_target_distance"))
@@ -65,18 +78,27 @@ if __name__ == "__main__":
             isInter = parser.get("drawio", "is_interactive")
             collStr = parser.get("drawio", "collapsed")
             collapsed = False
-            if collStr and collStr.lower() == True:
+            if collStr and collStr.lower() == "true":
                 collapsed = True
             isInteractive = False
             strokColor = "#f51919"
+            strokWidth = 3
             if isInter and isInter.lower() == "true":
                 isInteractive = True
-                if stroColor and len(strokColor) > 0:
+                if stroColor and len(stroColor) > 0:
                     strokColor = stroColor
-            ln.generateDrawIOXMLLayout(targetTableName.upper(), tableStyle, columnStyle, edgeStyle,
-                                       outPath, targetTableName.upper() + ".drawio", sourceSpaceFactor,
-                                       sourceTargetSpaceFactor, sourceTargetDist, itemHeight,collapsed ,isInteractive,
-                                       strokColor, filter)
+                if stroWidth and len(stroWidth) > 0:
+                    strokWidth = int(stroWidth)
+            if isDeep:
+                ln.generateDrawIOXMLLayoutDeep(linTables,linRelations,tableStyle,columnStyle,edgeStyle,
+                                               outPath,targetTableName.upper()+".drawio",sourceSpaceFactor,
+                                               sourceTargetSpaceFactor,sourceTargetDist,itemHeight,collapsed,isInteractive,
+                                               strokColor,strokWidth,filter)
+            else:
+                ln.generateDrawIOXMLLayout(targetTableName.upper(), tableStyle, columnStyle, edgeStyle,
+                                           outPath, targetTableName.upper() + ".drawio", sourceSpaceFactor,
+                                           sourceTargetSpaceFactor, sourceTargetDist, itemHeight,collapsed ,isInteractive,
+                                           strokColor,strokWidth, filter)
     """
     argParser.add_argument("-p", "--sqlpath", help="Path of the SQL scripts")
     argParser.add_argument("-d", "--ddlpath", help="Path of the DDL scripts")
