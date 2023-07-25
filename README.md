@@ -1,4 +1,4 @@
-##Purpose:
+## Purpose:
 This tool can be used to extract the column lineage from ETL scripts.
 It will draw the lineage wither using graphviz or DrawIO.
 Drawing using DrawIO has an additional feature which makes the diagram to
