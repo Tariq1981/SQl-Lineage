@@ -34,11 +34,14 @@ class QueryLineageAnalysis {
 - __convertCTEtoSubqueries__()
 - __readSql__()
 + createGraphviz()
++ createGraphvizDeep
 + writeGraphvizToPNG()
 + generateDrawIOXMLLayout()
++ generateDrawIOXMLLayoutDeep()
 + generateDrawIOCSV()
 + createfilteredRelations()
 + getLineage()
++ getLineageDeep()
 }
 
 class LineageDiagram {
