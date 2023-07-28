@@ -112,7 +112,7 @@ class QueryLineageAnalysis:
     def writeGraphvizToPNG(self,fullPath):
         self.diagram.saveGraphAsPNG(fullPath)
         jsonStr = self.diagram.getJsonGraphviz()
-        with open("jsonFile.json","w") as f:
+        with open("../jsonFile.json", "w") as f:
             f.write(jsonStr.decode("utf-8"))
 
 

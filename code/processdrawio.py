@@ -194,7 +194,7 @@ def duplicateEdgesForColumn(mxfile,columnObject,removeEdge=True):
     """
 
 if __name__ == "__main__":
-    with open("F_SUBSCRIBER_BASE_SEMANTIC_D.drawio") as file:
+    with open("../F_SUBSCRIBER_BASE_SEMANTIC_D.drawio") as file:
         xlstr = file.read()
 
     mxfile = objectify.fromstring(bytes(xlstr,'utf-8'))

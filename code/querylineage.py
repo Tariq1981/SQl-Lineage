@@ -16,7 +16,7 @@ from sqlparse import tokens as T
 Queries in the path with name as target table + .sql
 """
 class QueryLineage:
-    CONFIG_FILE_NAME = "lineage.config"
+    CONFIG_FILE_NAME = "../lineage.config"
     DEFAULT_TABLE_HEADER = "#96be5c"
     def __init__(self,sqlPath,DDLPath,templateFullPath,templateFileName,configPath):
         self.sqlPath=sqlPath

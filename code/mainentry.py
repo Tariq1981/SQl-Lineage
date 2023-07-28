@@ -26,7 +26,7 @@ if __name__ == "__main__":
     if deb and deb.lower() == "true":
         isDebug = True
         if not deb_path:
-            deb_path = "./"
+            deb_path = "../"
     sqlPath = parser.get("lineage","sql_path")
     ddlPath = parser.get("lineage","ddl_path")
     targetTableName = parser.get("lineage","target_table_name")

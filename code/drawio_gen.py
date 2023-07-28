@@ -66,4 +66,4 @@ if __name__ == "__main__":
     diagram.add_node('R2', top_label='Edge', bottom_label='MX240')
     diagram.add_link('R1', 'R2', label='DF', src_label='Gi0/1', trgt_label='ge-0/1/2')
     diagram.layout(algo="kk")
-    diagram.dump_file(filename="Sample_graph.graphml", folder="./")
+    diagram.dump_file(filename="../Sample_graph.graphml", folder="./")
