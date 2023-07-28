@@ -7,26 +7,26 @@ be interactive by showing the lineage for particular column when it is clicked.
 ## Classes:
 The following diagram demonstrates the classes developed for this tool:
 
-![Screenshot of a comment on a GitHub issue showing an image, added in the Markdown, of an Octocat smiling and raising a tentacle.](./lineage_class_diagram.png)
+![Screenshot of a comment on a GitHub issue showing an image, added in the Markdown, of an Octocat smiling and raising a tentacle.](images/lineage_class_diagram.png)
 
 The developed classes are:
-- [QueryLineageAnalysis](./querylineage2.py):
+- [QueryLineageAnalysis](code/querylineage2.py):
 This class is responsible for the following:
   * Reading and parsing the DDLs.
   * Reading and Parsing the SQLs which will be used in the getting the lineage.
   * Calling other classes to draw the returned lineage.
-- [LineageDiagram](./lineage_diagram.py): 
+- [LineageDiagram](code/lineage_diagram.py): 
 This class is responsible for the following:
   * Creating the graphviz format for the diagram using dot library
   * Saving the diagram as png, svg or text format using dot.
-- [LineageToDrawIO](./lineagetodrawio.py):
+- [LineageToDrawIO](code/lineagetodrawio.py):
 This class is responsible for the following:
   * Creating DrawIO file for the resulted lineage.
   * Adding interactivity on demand for the diagram.
   * Aligning the nodes in order not to overlap.
 
 ## Input file description:
-The input for this tool is an ini file similar to [lineage_config.ini](./lineage_config.ini)
+The input for this tool is an ini file similar to [lineage_config.ini](config/lineage_config.ini)
 Below are the possible fields and their descriptions:
 - **_Section lineage_**:
   * **sql_path**: The full path for the sql scripts which will be used in 
@@ -72,9 +72,28 @@ Below are the possible fields and their descriptions:
   * **collapsed**: Flag to create the nodes collapsed or not.
 
 ## Prequisites:
+This section ill list  the requireed things inorder to guarantee high accuracy fo the lineage:
 Diagraming options:
-
+- The columns in sql it is preferable to have them prefixed with the aliasof he table which they 
+belong to.
+- The DDLs for all the tables used should exist. It will help in identifiying the columns which
+- not satisfy the previous point.
+- The following keywords should be commented: **WHILE DO END WHILE,BEGIN,END, IF THEN ELSE END IF**
+- Encoding of the files in UTF-8
 ## Files
+ - [lineage_config.ini](./config/lineage_config.ini): Sample file for teh configuration to be passed to the tool.
+ - [lineage_class_diagram.png](./images/lineage_class_diagram.png): Class diagram for the code.
+ - [querylineage2.py](./code/querylineage2.py): This file contains the class QueryLineageAnalysis.
+ - [lineage_diagram.py](./code/lineage_diagram.py): This file contains the class LineageDiagram.
+ - [lineagetodrawio.py](./code/lineagetodrawio.py): This file contains the class LineageToDrawIO
+ - [mainentry.py](./code/mainentry.py): This file contain the entry point for the tool.
+To run this script from command line you need to path the full path for the configuration 
+file with -p or --path prefix
+ - [DDL/*.sql](./DDL/*.sql): This files contain sample for DDL scripts.
+ - [sql/*.sql](./sql/*.sql): This files contain sample sql scripts.
+
+
+
 ## Limitations:
 
 ## Sample SQL and Lineage diagrams creen shots
