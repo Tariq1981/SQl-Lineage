@@ -101,7 +101,9 @@ the keywords discussed in previous section.
 ## Sample screen shots
 * Sample DrawIO diagram:
 ![class diagram](images/Sample_drawio.png)
+
 * Sample Graphvis diagram:
+
 ![class diagram](images/Tab3.png)
  
 ## Libraries
