@@ -7,7 +7,7 @@ be interactive by showing the lineage for particular column when it is clicked.
 ## Classes:
 The following diagram demonstrates the classes developed for this tool:
 
-![Screenshot of a comment on a GitHub issue showing an image, added in the Markdown, of an Octocat smiling and raising a tentacle.](images/lineage_class_diagram.png)
+![class diagram](images/lineage_class_diagram.png)
 
 The developed classes are:
 - [QueryLineageAnalysis](code/querylineage2.py):
@@ -92,10 +92,16 @@ file with -p or --path prefix
  - [DDL/*.sql](./DDL/*.sql): This files contain sample for DDL scripts.
  - [sql/*.sql](./sql/*.sql): This files contain sample sql scripts.
 
-
-
 ## Limitations:
+- The tool can't handle MERGE or update statements yet.
+- Some preparation should be done on the SQL scripts before using the tool like removing 
+the keywords discussed in previous section.
+- The encoding of the input files should be UTF-8
 
-## Sample SQL and Lineage diagrams creen shots
-
+## Sample screen shots
+* Sample DrawIO diagram:
+![class diagram](images/Sample_drawio.png)
+* Sample Graphvis diagram:
+![class diagram](images/Tab3.png)
+ 
 ## Libraries
