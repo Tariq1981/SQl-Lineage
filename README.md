@@ -1,6 +1,6 @@
 ## Purpose:
-This tool can be used to extract the column lineage from ETL scripts.
-It will draw the lineage wither using graphviz or DrawIO.
+This tool can be used to extract the column lineage from sql ETL scripts.
+It will draw the lineage either using graphviz or DrawIO.
 Drawing using DrawIO has an additional feature which makes the diagram to
 be interactive by showing the lineage for particular column when it is clicked.
 
@@ -106,4 +106,9 @@ the keywords discussed in previous section.
 
 ![class diagram](images/Tab3.png)
  
-## Libraries
+## Libraries used:
+- [sqlparse 0.4.3](https://pypi.org/project/sqlparse/0.4.3/)
+- [simple-ddl-parser 0.29.1](https://pypi.org/project/simple-ddl-parser/0.29.1/)
+- [sqlglot 16.4.0](https://pypi.org/project/sqlglot/16.4.0/)
+- [pydot 1.4.2](https://pypi.org/project/pydot/)
+- [lxml 4.9.1](https://pypi.org/project/lxml/4.9.1/)
