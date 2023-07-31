@@ -25,7 +25,8 @@ class QueryLineageAnalysis:
     DEFAULT_TABLE_HEADER = "#96be5c"
     DEFAULT_EDGE = "#aeaeae"
 
-    def __init__(self, sqlPath, DDLPath, defaultDB="",isDebug=False,debugPath="./"):
+    def __init__(self,dialect ,sqlPath, DDLPath, defaultDB="",isDebug=False,debugPath="./"):
+        self.dialect = dialect
         self.sqlPath = sqlPath
         self.DDLPath = DDLPath
         self.defaultDB = defaultDB
@@ -56,7 +57,7 @@ class QueryLineageAnalysis:
                 with open(fileName, "r") as f:
                     lines = f.readlines()
                 ddl = "".join(lines)
-                result = DDLParser(ddl).run(output_mode="bigquery")
+                result = DDLParser(ddl).run(output_mode=self.dialect)
                 for table in result:
                     for column in table['columns']:
                         tableName = table['table_name'].replace("`","").upper()
@@ -346,7 +347,7 @@ class QueryLineageAnalysis:
         return {'tables': tables, 'relations': relations}
 
     def __getSQLLineage__(self,sqlState, ddlList):
-        sqlObbj = parse_one(sqlState, "bigquery")
+        sqlObbj = parse_one(sqlState, self.dialect)
         self.__getPivotColumnsToRealColumn__(sqlObbj)
         (targTable,DBName) = self.__getTargetTable__(sqlObbj)
         if DBName:
@@ -634,7 +635,7 @@ class QueryLineageAnalysis:
         return ls
 
     def __replaceStarInScript__(self,sqlState, ddlList):
-        sqlObj = parse_one(sqlState, "bigquery")
+        sqlObj = parse_one(sqlState, self.dialect)
         #print(sqlObj)
         sels = list(sqlObj.find_all(exp.Select))
 
@@ -680,7 +681,7 @@ class QueryLineageAnalysis:
                     cc.parent = sel
                     cols.append(cc)
 
-        return sqlObj.sql(dialect="bigquery")
+        return sqlObj.sql(dialect=self.dialect)
 
     def __convertCreateSelectToSubuery__(self,stmt):
         if "INSERT " in "".strip():
@@ -789,7 +790,7 @@ class QueryLineageAnalysis:
     def __convertCTEtoSubqueries__(self,sqlStmt):
         def transformer(node):
             if isinstance(node, exp.Table) and node.name.upper() in dictCTE:
-                return parse_one("({}) AS {}".format(dictCTE[node.name.upper()].sql(dialect="bigquery"), node.alias_or_name), "bigquery")
+                return parse_one("({}) AS {}".format(dictCTE[node.name.upper()].sql(dialect=self.dialect), node.alias_or_name), self.dialect)
             return node
 
         def transformerNoWith(node):
@@ -801,7 +802,7 @@ class QueryLineageAnalysis:
                 node.ctes.clear()
             return node
 
-        sqlObj = parse_one(sqlStmt, "bigquery")
+        sqlObj = parse_one(sqlStmt, self.dialect)
         dictCTE = {}
         ctes = list(sqlObj.find_all(exp.CTE))
         if len(ctes) == 0:
@@ -815,7 +816,7 @@ class QueryLineageAnalysis:
         transformed_tree = sqlObj.transform(transformer)
         transformed_tree = transformed_tree.transform(transformerNoWith)
         # transformed_tree.args['with'] = None
-        return transformed_tree.sql(dialect="bigquery")
+        return transformed_tree.sql(dialect=self.dialect)
 
     def __readSql__(self, entrytableName):
         fullPath = "{}/{}.sql".format(self.sqlPath, entrytableName)

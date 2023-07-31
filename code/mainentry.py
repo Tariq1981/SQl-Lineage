@@ -12,6 +12,7 @@ if __name__ == "__main__":
     args = argParser.parse_args()
     parser = ConfigParser()
     parser.read(args.path)
+    dialect = parser.get("lineage","dialect")
     isDeep = False
     deep = parser.get("lineage","deep")
     if deep and deep.lower() == "true":
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     graphType = parser.get("graph", "type")
     outPath = parser.get("graph","output_path")
     defaultDB = parser.get("lineage","defaultDB")
-    ln = QueryLineageAnalysis(sqlPath, ddlPath,defaultDB,isDebug,deb_path)
+    ln = QueryLineageAnalysis(dialect,sqlPath, ddlPath,defaultDB,isDebug,deb_path)
     if isDeep:
         (linTables,linRelations) = ln.getLineageDeep(targetTableName.upper(),verbose)
     else:
