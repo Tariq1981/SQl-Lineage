@@ -25,7 +25,7 @@ class QueryLineageAnalysis:
     DEFAULT_TABLE_HEADER = "#96be5c"
     DEFAULT_EDGE = "#aeaeae"
 
-    def __init__(self,dialect ,sqlPath, DDLPath, defaultDB="",isDebug=False,debugPath="./"):
+    def __init__(self,dialect, sqlPath, DDLPath, defaultDB="",isDebug=False,debugPath="./"):
         self.dialect = dialect
         self.sqlPath = sqlPath
         self.DDLPath = DDLPath
@@ -54,7 +54,7 @@ class QueryLineageAnalysis:
         for file in files:
             fileName = "{}/{}".format(self.DDLPath, file)
             if os.path.isfile(fileName):
-                with open(fileName, "r") as f:
+                with open(fileName, "r",encoding="utf-8") as f:
                     lines = f.readlines()
                 ddl = "".join(lines)
                 result = DDLParser(ddl).run(output_mode=self.dialect)
@@ -113,7 +113,7 @@ class QueryLineageAnalysis:
     def writeGraphvizToPNG(self,fullPath):
         self.diagram.saveGraphAsPNG(fullPath)
         jsonStr = self.diagram.getJsonGraphviz()
-        with open("../jsonFile.json", "w") as f:
+        with open("jsonFile.json","w") as f:
             f.write(jsonStr.decode("utf-8"))
 
 
@@ -399,7 +399,7 @@ class QueryLineageAnalysis:
         ls = []
         sels = list(sqlObj.find_all(exp.Select))
         if len(sels) == 0:
-            return None
+            return []
         elif isinstance(sels[0].parent,exp.Union):
             unionParent = sels[0].parent
             colInd = -1
@@ -616,12 +616,15 @@ class QueryLineageAnalysis:
                     if hasattr(col, "table") and len(col.table) > 0:
                         if col.table == fromObj.alias:
                             sels = list(f.find_all(exp.Select))
-                            for coli in sels[0].selects:
-                                if isinstance(coli.this, exp.Star):
-                                    cols = self.__replaceStarInQuery__(coli, ddlList)
-                                    ls.extend(cols)
-                                else:
-                                    ls.append(coli.alias_or_name)
+                            if len(sels) > 0:
+                                for coli in sels[0].selects:
+                                    if isinstance(coli.this, exp.Star):
+                                        cols = self.__replaceStarInQuery__(coli, ddlList)
+                                        ls.extend(cols)
+                                    else:
+                                        ls.append(coli.alias_or_name)
+                            else:
+                                ls.extend(ddlList[fromObj.this.alias_or_name.upper()])
                             break
                     else:
                         sels = list(f.find_all(exp.Select))
@@ -822,7 +825,7 @@ class QueryLineageAnalysis:
         fullPath = "{}/{}.sql".format(self.sqlPath, entrytableName)
         if not (os.path.exists(fullPath)):
             return None
-        with open(fullPath, 'r') as file:
+        with open(fullPath, 'r',encoding="utf-8") as file:
             lines = file.readlines()
 
         gg =  "".join(lines)
@@ -1124,8 +1127,79 @@ class QueryLineageAnalysis:
             tableLevelByLevel[tableLevel[table]].append(table)
         return tableLevelByLevel
 
+    """
+    def saveLineageCollibra(self,targetTable,linRelations,outputPath, outputFileName):
+        import csv
+        fout = open("{}/{}".format(outputPath, outputFileName), "w",newline='')
+        fields = ["Full Name","Name","Community","Domain Type","Domain","Status","Asset Type",
+                  "is part of [Data Entity] > Name","is part of [Data Entity] > Full Name",
+                  "is part of [Data Entity] > Asset Type","is part of [Data Entity] > Community",
+                  "is part of [Data Entity] > Domain Type","is part of [Data Entity] > Domain",
+                  "GS from EIM [Data Entity] > Name","GS from EIM [Data Entity] > Full Name",
+                  "GS from EIM [Data Entity] > Asset Type","GS from EIM [Data Entity] > Community",
+                  "GS from EIM [Data Entity] > Domain Type","GS from EIM [Data Entity] > Domain",
+                  "is affected by [Data Attribute] > Name","is affected by [Data Attribute] > Full Name",
+                  "is affected by [Data Attribute] > Asset Type","is affected by [Data Attribute] > Community",
+                  "is affected by [Data Attribute] > Domain Type","is affected by [Data Attribute] > Domain",
+                  "affects [Data Entity] > Name","affects [Data Entity] > Full Name","affects [Data Entity] > Asset Type",
+                  "affects [Data Entity] > Community","affects [Data Entity] > Domain Type","affects [Data Entity] > Domain",
+                  "affects [Data Attribute] > Name","affects [Data Attribute] > Full Name","affects [Data Attribute] > Asset Type",
+                  "affects [Data Attribute] > Community","affects [Data Attribute] > Domain Type","affects [Data Attribute] > Domain"]
+        csvw = csv.DictWriter(fout,fields)
+        csvw.writeheader()
+        for ind in range(0, len(linRelations)):
+            tempRelations = linRelations[ind]
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tabs = set()
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    if srcTable in tabs:
+                        continue
+                    tabs.add(srcTable)
+                    eimFlag = False
+                    if self.DBTableLookup[srcTable] == "VFPT_DH_LAKE_EDW_INTEGRATED_S":
+                        eimFlag = True
+                    csvw.writerow({"Full Name":"Logical Data Models>Core GS>{}".format(targetTable.lower()),
+                                   "Name":targetTable.lower(),
+                                   "Community":"Logical Data Models",
+                                   "Domain Type":"Logical Data Dictionary",
+                                   "Domain":"Core GS",
+                                   "Status":"Candidate",
+                                   "Asset Type":"Data Entity",
+                                   "GS from EIM [Data Entity] > Name":srcTable.lower() if eimFlag else "",
+                                   "GS from EIM [Data Entity] > Full Name":"Logical Data Models>Core EIM>{}".format(srcTable.lower()) if eimFlag else "",
+                                   "GS from EIM [Data Entity] > Asset Type":"Data Entity" if eimFlag else "",
+                                   "GS from EIM [Data Entity] > Community":"Logical Data Models" if eimFlag else "",
+                                   "GS from EIM [Data Entity] > Domain Type":"Logical Data Dictionary" if eimFlag else "",
+                                   "GS from EIM [Data Entity] > Domain":"Core EIM",
+                                   "affects [Data Entity] > Name":srcTable.lower() if not eimFlag else "",
+                                   "affects [Data Entity] > Full Name":"Logical Data Models>Core GS>{}".format(srcTable.lower()) if not eimFlag else "",
+                                   "affects [Data Entity] > Asset Type":"Data Entity" if not eimFlag else "",
+                                   "affects [Data Entity] > Community":"Logical Data Models" if not eimFlag else "",
+                                   "affects [Data Entity] > Domain Type":"Logical Data Dictionary" if not eimFlag else "",
+                                   "affects [Data Entity] > Domain":"Core GS" if not eimFlag else "",
+                                   })
 
+        fout.close()
 
+        fout1 = open("{}/{}".format(outputPath, "Temp_"+outputFileName), "w", newline='')
+        fields = ["Target Table", "Target Column", "Source Table", "Source Column"]
+        csvw1 = csv.DictWriter(fout1, fields)
+        csvw1.writeheader()
+        for ind in range(0, len(linRelations)):
+            tempRelations = linRelations[ind]
+            for relation in tempRelations.keys():
+                tgtTable = relation[0]
+                tgtColumn = relation[1]
+                for src in tempRelations[relation]:
+                    srcTable = src[0]
+                    srcColumn = src[1]
+                    csvw1.writerow({"Target Table":tgtTable,"Target Column":tgtColumn,
+                                   "Source Table":srcTable,"Source Column":srcColumn})
+
+        fout1.close()
+        """
 
 
 
